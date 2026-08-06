@@ -1,0 +1,7 @@
+@use 'vuetify/settings' with (
+  $body-font-family: ('Montserrat', sans-serif),
+  $heading-font-family: ('Cormorant Garamond', serif),
+  $border-radius-root: 4px,
+  $button-border-radius: 2px,
+  $card-border-radius: 8px
+);

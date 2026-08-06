@@ -1,0 +1,48 @@
+@use '../abstracts' as *;
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  font-weight: $font-weight-medium;
+  line-height: $line-height-tight;
+  color: var(--color-text-primary);
+}
+
+h1 { font-size: $font-size-4xl; }
+h2 { font-size: $font-size-3xl; }
+h3 { font-size: $font-size-2xl; }
+h4 { font-size: $font-size-xl; }
+h5 { font-size: $font-size-lg; }
+h6 { font-size: $font-size-md; }
+
+.text-heading {
+  font-family: var(--font-heading);
+}
+
+.text-body {
+  font-family: var(--font-body);
+}
+
+.text-uppercase {
+  text-transform: uppercase;
+  letter-spacing: $letter-spacing-wider;
+}
+
+.text-muted {
+  color: var(--color-text-muted);
+}
+
+.text-secondary {
+  color: var(--color-text-secondary);
+}
+
+.text-accent {
+  color: var(--color-accent);
+}
+
+.text-center {
+  text-align: center;
+}
+
+.text-sm { font-size: $font-size-sm; }
+.text-base { font-size: $font-size-base; }
+.text-lg { font-size: $font-size-lg; }
+.text-xl { font-size: $font-size-xl; }

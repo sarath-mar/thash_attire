@@ -1,0 +1,16 @@
+export const ValidationMessages = Object.freeze({
+  REQUIRED: 'This field is required',
+  EMAIL: 'Please enter a valid email address',
+  PHONE: 'Please enter a valid phone number',
+  MIN_LENGTH: (min) => `Must be at least ${min} characters`,
+  MAX_LENGTH: (max) => `Must not exceed ${max} characters`,
+  MIN_VALUE: (min) => `Must be at least ${min}`,
+  MAX_VALUE: (max) => `Must not exceed ${max}`,
+  POSITIVE_NUMBER: 'Must be a positive number',
+  INVALID_URL: 'Please enter a valid URL',
+  PASSWORD_MIN: 'Password must be at least 8 characters',
+  PASSWORD_MATCH: 'Passwords do not match',
+  SELECT_OPTION: 'Please select an option',
+  INVALID_FILE_TYPE: 'Invalid file type',
+  FILE_TOO_LARGE: (size) => `File size must not exceed ${size}`,
+})

@@ -1,0 +1,71 @@
+@use '../abstracts' as *;
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.container {
+  @include container;
+}
+
+.container--narrow {
+  @include container(var(--container-narrow));
+}
+
+.section {
+  padding-block: var(--spacing-3xl);
+
+  @include respond-below(md) {
+    padding-block: var(--spacing-2xl);
+  }
+}
+
+.section-title {
+  @include heading($font-size-3xl);
+  text-align: center;
+  margin-bottom: var(--spacing-sm);
+}
+
+.section-subtitle {
+  @include body-text($font-size-base, var(--color-text-secondary));
+  text-align: center;
+  max-width: 560px;
+  margin-inline: auto;
+  margin-bottom: var(--spacing-2xl);
+}
+
+.divider {
+  width: 48px;
+  height: 1px;
+  background: var(--color-accent);
+  margin-inline: auto;
+  margin-bottom: var(--spacing-lg);
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity var(--transition-base);
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: transform var(--transition-base), opacity var(--transition-base);
+}
+
+.slide-up-enter-from,
+.slide-up-leave-to {
+  transform: translateY(16px);
+  opacity: 0;
+}
