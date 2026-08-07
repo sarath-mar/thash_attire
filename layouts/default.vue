@@ -1,10 +1,11 @@
 <template>
   <div class="ta-layout-default">
-    <AppHeader />
+    <!-- <AppHeader /> -->
+    <LayoutAppHeader />
     <main class="ta-layout-default__main">
       <slot />
     </main>
-    <AppFooter />
+    <LayoutAppFooter />
     <AppSnackbar />
   </div>
 </template>
@@ -17,10 +18,10 @@
 
   &__main {
     flex: 1;
-    padding-top: var(--header-height);
+    // padding-top: var(--header-height);
 
     @include respond-below(lg) {
-      padding-top: var(--header-height-mobile);
+      // padding-top: var(--header-height-mobile);
     }
   }
 }

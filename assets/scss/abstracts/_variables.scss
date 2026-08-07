@@ -1,26 +1,38 @@
 // ─── CSS Custom Properties (Theme Colors) ───────────────────────────────────
 :root {
   // Brand
-  --color-primary: #1a1a1a;
-  --color-secondary: #8b7355;
-  --color-accent: #c9a96e;
-  --color-accent-light: #e8d5b5;
+  --color-primary: #121212;
+  --color-primary-light: #242424;
+  --color-secondary: #7e674b;
+  --color-accent: #c5a059;
+  --color-accent-hover: #d4af37;
+  --color-accent-light: #f4ebd9;
+  --color-accent-gold-grad: linear-gradient(135deg, #c5a059 0%, #e5c378 50%, #b89146 100%);
+  --color-gold-glow: rgba(197, 160, 89, 0.25);
 
   // Backgrounds
-  --color-bg: #fafaf8;
-  --color-bg-alt: #f5f0eb;
+  --color-bg: #faf8f5;
+  --color-bg-alt: #f4efea;
   --color-surface: #ffffff;
   --color-surface-elevated: #ffffff;
+  --color-surface-translucent: rgba(255, 255, 255, 0.85);
 
   // Text
-  --color-text-primary: #1a1a1a;
-  --color-text-secondary: #6b6b6b;
-  --color-text-muted: #9ca3af;
+  --color-text-primary: #121212;
+  --color-text-secondary: #5a5a5a;
+  --color-text-muted: #8e8e8e;
   --color-text-inverse: #ffffff;
+  --color-text-gold: #c5a059;
 
   // Borders
-  --color-border: #e8e4df;
-  --color-border-light: #f0ece8;
+  --color-border: #e6dfd5;
+  --color-border-light: #f0eae1;
+  --color-border-gold: rgba(197, 160, 89, 0.4);
+
+  // Glassmorphism
+  --glass-bg: rgba(255, 255, 255, 0.88);
+  --glass-border: rgba(255, 255, 255, 0.6);
+  --glass-backdrop: blur(16px);
 
   // Status
   --color-success: #2d6a4f;
@@ -29,14 +41,16 @@
   --color-info: #6b7280;
 
   // Overlays
-  --color-overlay: rgba(26, 26, 26, 0.5);
-  --color-overlay-light: rgba(26, 26, 26, 0.2);
+  --color-overlay: rgba(18, 18, 18, 0.6);
+  --color-overlay-light: rgba(18, 18, 18, 0.25);
+  --color-overlay-gradient: linear-gradient(180deg, rgba(18, 18, 18, 0) 0%, rgba(18, 18, 18, 0.75) 100%);
 
   // Shadows
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
-  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.16);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 12px 36px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 50px rgba(0, 0, 0, 0.15);
+  --shadow-gold: 0 8px 24px rgba(197, 160, 89, 0.2);
 
   // Typography
   --font-heading: 'Cormorant Garamond', Georgia, serif;

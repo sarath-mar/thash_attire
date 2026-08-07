@@ -1,9 +1,12 @@
 <template>
   <section class="ta-featured section">
     <div class="container">
-      <div class="divider" />
-      <h2 class="section-title">{{ title }}</h2>
-      <p v-if="subtitle" class="section-subtitle">{{ subtitle }}</p>
+      <div class="text-center mb-6">
+        <span class="eyebrow mb-1">HAUTE COUTURE</span>
+        <h2 class="section-title">{{ title }}</h2>
+        <div class="divider" />
+        <p v-if="subtitle" class="section-subtitle">{{ subtitle }}</p>
+      </div>
 
       <AppLoading v-if="loading" />
 
@@ -23,8 +26,8 @@
       />
 
       <div v-if="products.length && showViewAll" class="ta-featured__action">
-        <AppButton outline to="/products">
-          View All Collection
+        <AppButton premium to="/products" class="px-8">
+          Explore Complete Collection
         </AppButton>
       </div>
     </div>
@@ -43,12 +46,19 @@ defineProps({
 
 <style scoped lang="scss">
 .ta-featured {
+  background: var(--color-bg);
+
   &__grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: var(--spacing-lg);
+    gap: var(--spacing-xl);
 
     @include respond-below(xl) {
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--spacing-lg);
+    }
+
+    @include respond-below(lg) {
       grid-template-columns: repeat(3, 1fr);
     }
 
@@ -59,12 +69,14 @@ defineProps({
 
     @include respond-below(sm) {
       grid-template-columns: repeat(2, 1fr);
+      gap: var(--spacing-sm);
     }
   }
 
   &__action {
     @include flex-center;
-    margin-top: var(--spacing-2xl);
+    margin-top: var(--spacing-3xl);
   }
 }
 </style>
+
