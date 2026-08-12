@@ -1,11 +1,35 @@
 <template>
   <div class="ta-admin-dashboard">
-    <h1 class="ta-admin-dashboard__title">Dashboard</h1>
-    <p class="ta-admin-dashboard__subtitle">Welcome to Thash Attire Admin Panel</p>
+    <AdminPageHeader
+      title="Dashboard"
+      subtitle="Overview of your business performance"
+    />
 
-    <div class="ta-admin-dashboard__placeholder">
-      <v-icon icon="mdi-view-dashboard" size="64" color="grey-lighten-1" />
-      <p>Dashboard module will be built in the next phase.</p>
+    <!-- Summary Stats -->
+    <DashboardSummary
+      :summary="summary"
+      :loading="loadingSummary"
+      class="ta-admin-dashboard__summary"
+    />
+
+    <!-- Data Sections -->
+    <div class="ta-admin-dashboard__sections">
+      <DashboardRecentSales
+        :sales="recentSales"
+        :loading="loadingRecentSales"
+        class="ta-admin-dashboard__recent-sales"
+      />
+
+      <div class="ta-admin-dashboard__side">
+        <DashboardLowStock
+          :products="lowStockProducts"
+          :loading="loadingLowStock"
+        />
+        <DashboardTopProducts
+          :products="topProducts"
+          :loading="loadingTopProducts"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -14,35 +38,48 @@
 import { PageTitles } from '~/constants/pageTitles.js'
 
 definePageMeta({
-  layout: 'blank',
+  layout: 'admin',
   middleware: 'admin',
 })
 
 useHead({ title: PageTitles.ADMIN_DASHBOARD })
+
+const {
+  summary,
+  recentSales,
+  lowStockProducts,
+  topProducts,
+  loadingSummary,
+  loadingRecentSales,
+  loadingLowStock,
+  loadingTopProducts,
+  fetchAll,
+} = useDashboard()
+
+onMounted(fetchAll)
 </script>
 
 <style scoped lang="scss">
 .ta-admin-dashboard {
-  padding: var(--spacing-2xl);
-
-  &__title {
-    @include heading($font-size-2xl);
-    margin-bottom: var(--spacing-xs);
+  &__summary {
+    margin-bottom: var(--spacing-lg);
   }
 
-  &__subtitle {
-    @include body-text($font-size-sm, var(--color-text-muted));
-    margin-bottom: var(--spacing-2xl);
+  &__sections {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: var(--spacing-md);
+    align-items: start;
+
+    @include respond-below(lg) {
+      grid-template-columns: 1fr;
+    }
   }
 
-  &__placeholder {
-    @include flex-center;
+  &__side {
+    display: flex;
     flex-direction: column;
     gap: var(--spacing-md);
-    padding: var(--spacing-4xl);
-    background: var(--color-bg-alt);
-    border-radius: var(--radius-lg);
-    color: var(--color-text-muted);
   }
 }
 </style>

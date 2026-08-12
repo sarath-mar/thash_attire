@@ -7,8 +7,9 @@ export function useProducts() {
   const product = ref(null)
   const total = ref(0)
   const loading = ref(false)
+  const saving = ref(false)
   const error = ref(null)
-  const { error: showError } = useSnackbar()
+  const { success, error: showError } = useSnackbar()
 
   const fetchProducts = async (filters = {}) => {
     loading.value = true
@@ -70,8 +71,54 @@ export function useProducts() {
     }
   }
 
+  const createProduct = async (data) => {
+    saving.value = true
+    try {
+      const result = await ProductService.create(data)
+      products.value = [result, ...products.value]
+      total.value += 1
+      success('Product created successfully')
+      return result
+    } catch (err) {
+      showError(err.message || ErrorMessages.GENERIC)
+      return null
+    } finally {
+      saving.value = false
+    }
+  }
+
+  const updateProduct = async (id, data) => {
+    saving.value = true
+    try {
+      const result = await ProductService.update(id, data)
+      const idx = products.value.findIndex(p => p.id === id)
+      if (idx !== -1) products.value[idx] = result
+      if (product.value?.id === id) product.value = result
+      success('Product updated successfully')
+      return result
+    } catch (err) {
+      showError(err.message || ErrorMessages.GENERIC)
+      return null
+    } finally {
+      saving.value = false
+    }
+  }
+
+  const deleteProduct = async (id) => {
+    try {
+      await ProductService.delete(id)
+      products.value = products.value.filter(p => p.id !== id)
+      total.value = Math.max(0, total.value - 1)
+      success('Product deleted successfully')
+      return true
+    } catch (err) {
+      showError(err.message || ErrorMessages.GENERIC)
+      return false
+    }
+  }
+
   const totalPages = computed(() =>
-    Math.ceil(total.value / (PaginationDefaults.LIMIT)),
+    Math.ceil(total.value / (PaginationDefaults.ADMIN_LIMIT)),
   )
 
   return {
@@ -79,11 +126,15 @@ export function useProducts() {
     product: readonly(product),
     total: readonly(total),
     loading: readonly(loading),
+    saving: readonly(saving),
     error: readonly(error),
     totalPages,
     fetchProducts,
     fetchProduct,
     fetchFeatured,
     fetchTrending,
+    createProduct,
+    updateProduct,
+    deleteProduct,
   }
 }

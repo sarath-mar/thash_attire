@@ -24,7 +24,9 @@ export function useAuth() {
   const login = async (email, password) => {
     loading.value = true
     try {
+
       const data = await AuthService.login(email, password)
+      console.log('sher data', data)
       session.value = data.session
       user.value = data.user
       success(SuccessMessages.LOGIN)

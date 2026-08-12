@@ -11,11 +11,14 @@ export const Routes = Object.freeze({
   ADMIN_PRODUCT_EDIT: (id) => `/admin/products/${id}/edit`,
   ADMIN_CATEGORIES: '/admin/categories',
   ADMIN_MATERIALS: '/admin/materials',
+  ADMIN_MATERIAL_PURCHASES: '/admin/materials/purchases',
   ADMIN_INVENTORY: '/admin/inventory',
   ADMIN_SALES: '/admin/sales',
+  ADMIN_SALE_CREATE: '/admin/sales/create',
   ADMIN_CUSTOMERS: '/admin/customers',
   ADMIN_EXPENSES: '/admin/expenses',
   ADMIN_BANNERS: '/admin/banners',
   ADMIN_REPORTS: '/admin/reports',
   ADMIN_SETTINGS: '/admin/settings',
 })
+

@@ -12,6 +12,13 @@ export const PaymentStatusLabels = Object.freeze({
   [PaymentStatus.REFUNDED]: 'Refunded',
 })
 
+export const PaymentStatusColors = Object.freeze({
+  [PaymentStatus.PENDING]: 'warning',
+  [PaymentStatus.PAID]: 'success',
+  [PaymentStatus.PARTIAL]: 'info',
+  [PaymentStatus.REFUNDED]: 'error',
+})
+
 export const PaymentMethod = Object.freeze({
   CASH: 'cash',
   UPI: 'upi',
@@ -25,3 +32,4 @@ export const PaymentMethodLabels = Object.freeze({
   [PaymentMethod.CARD]: 'Card',
   [PaymentMethod.BANK_TRANSFER]: 'Bank Transfer',
 })
+

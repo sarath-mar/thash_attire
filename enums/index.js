@@ -1,7 +1,7 @@
 export { Roles, RoleLabels } from './roles.js'
 export { ProductStatus, ProductStatusLabels, ProductStatusColors } from './productStatus.js'
 export { SaleStatus, SaleStatusLabels, SaleStatusColors } from './saleStatus.js'
-export { PaymentStatus, PaymentStatusLabels, PaymentMethod, PaymentMethodLabels } from './paymentStatus.js'
+export { PaymentStatus, PaymentStatusLabels, PaymentStatusColors, PaymentMethod, PaymentMethodLabels } from './paymentStatus.js'
 export { ExpenseType, ExpenseTypeLabels } from './expenseType.js'
 export { MaterialUnit, MaterialUnitLabels, MaterialUnitShort } from './materialUnit.js'
 export { StorageBucket, StorageBucketPaths } from './storageBucket.js'

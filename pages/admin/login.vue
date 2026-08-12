@@ -7,7 +7,7 @@
       </div>
 
       <v-form ref="formRef" v-model="isValid" @submit.prevent="handleLogin">
-        <AppTextField
+        <CommonAppTextField
           v-model="email"
           label="Email"
           type="email"
@@ -16,7 +16,7 @@
           class="ta-admin-login__field"
         />
 
-        <AppTextField
+        <CommonAppTextField
           v-model="password"
           label="Password"
           :type="showPassword ? 'text' : 'password'"
@@ -27,7 +27,7 @@
           @click:append-inner="showPassword = !showPassword"
         />
 
-        <AppButton
+        <CommonAppButton
           premium
           block
           type="submit"
@@ -36,7 +36,7 @@
           class="ta-admin-login__submit"
         >
           Sign In
-        </AppButton>
+        </CommonAppButton>
       </v-form>
 
       <NuxtLink to="/" class="ta-admin-login__back">
@@ -71,6 +71,8 @@ const handleLogin = async () => {
   if (!valid) return
 
   const success = await login(email.value, password.value)
+  console.log('sher success', success)
+
   if (success) {
     await navigateTo(Routes.ADMIN_DASHBOARD)
   }
