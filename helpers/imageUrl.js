@@ -17,3 +17,9 @@ export function getThumbnailUrl(url, width = 400) {
   if (!url) return DefaultImages.PRODUCT
   return url
 }
+
+export function getProductImageUrl(product, fallback = DefaultImages.PRODUCT) {
+  if (!product) return fallback
+  const images = product.images || []
+  return getImageUrl(images[0], fallback)
+}

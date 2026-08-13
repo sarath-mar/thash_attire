@@ -33,8 +33,9 @@ export const AdminNavItems = Object.freeze([
     icon: 'mdi-scissors-cutting',
     to: Routes.ADMIN_MATERIALS,
     children: [
-      { title: 'All Materials', icon: 'mdi-format-list-bulleted', to: Routes.ADMIN_MATERIALS },
-      { title: 'Purchases', icon: 'mdi-cart-outline', to: Routes.ADMIN_MATERIAL_PURCHASES },
+      { title: 'Product Materials', icon: 'mdi-fabric', to: Routes.ADMIN_MATERIALS },
+      { title: 'Common Materials', icon: 'mdi-gift-outline', to: Routes.ADMIN_COMMON_MATERIALS },
+      { title: 'Purchases', icon: 'mdi-cart-plus', to: Routes.ADMIN_MATERIAL_PURCHASES },
     ],
   },
   {
@@ -43,9 +44,13 @@ export const AdminNavItems = Object.freeze([
     to: Routes.ADMIN_CUSTOMERS,
   },
   {
-    title: 'Sales',
-    icon: 'mdi-cart-check',
-    to: Routes.ADMIN_SALES,
+    title: 'Orders',
+    icon: 'mdi-clipboard-list-outline',
+    to: Routes.ADMIN_ORDERS,
+    children: [
+      { title: 'All Orders', icon: 'mdi-format-list-bulleted', to: Routes.ADMIN_ORDERS },
+      { title: 'New Order', icon: 'mdi-plus-circle-outline', to: Routes.ADMIN_ORDER_CREATE },
+    ],
   },
   {
     title: 'Expenses',
