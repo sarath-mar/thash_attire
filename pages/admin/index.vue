@@ -216,7 +216,7 @@
 
 <script setup>
 import { PageTitles } from '~/constants/pageTitles.js'
-import { MOCK_DASHBOARD_STATS } from '~/mock/dashboard.js'
+
 
 definePageMeta({
   layout: 'admin',
@@ -225,22 +225,53 @@ definePageMeta({
 
 useHead({ title: PageTitles.ADMIN_DASHBOARD })
 
-// Use the enhanced mock dashboard stats
-const loading = ref(false)
-const stats = ref({ ...MOCK_DASHBOARD_STATS })
+// Reusing useDashboard
+const {
+  summary,
+  recentSales,
+  lowStockProducts,
+  topProducts,
+  fetchAll,
+  loadingSummary,
+  loadingRecentSales,
+  loadingLowStock,
+  loadingTopProducts
+} = useDashboard()
 
-// Also reuse existing topProducts from useDashboard
-const { topProducts, loadingTopProducts } = useDashboard()
+const loading = computed(() => loadingSummary.value || loadingRecentSales.value || loadingLowStock.value || loadingTopProducts.value)
+
+const stats = computed(() => {
+  const s = summary.value || {}
+  return {
+    today_revenue: 0, // Not explicitly calculated in simplified DashboardService
+    month_revenue: s.totalRevenue || 0,
+    total_revenue: s.totalRevenue || 0,
+    total_orders: s.totalSales || 0,
+    orders_new: 0,
+    orders_payment_pending: 0,
+    orders_in_stitching: 0,
+    orders_ready_to_ship: 0,
+    orders_shipped: 0,
+    orders_delivered: 0,
+    month_product_cost: 0,
+    month_revenue_calc: s.totalRevenue || 0,
+    month_gross_profit: s.estimatedProfit || 0,
+    month_profit_margin: s.totalRevenue ? Math.round((s.estimatedProfit / s.totalRevenue) * 100) : 0,
+    total_material_value: 0,
+    low_stock_materials: 0,
+    out_of_stock_materials: 0,
+    chart_data: { labels: [], datasets: [] },
+    recent_orders: recentSales.value || [],
+    low_stock_materials_list: lowStockProducts.value || []
+  }
+})
 
 const todayLabel = computed(() => {
   return new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 })
 
-onMounted(async () => {
-  loading.value = true
-  // Simulate load
-  await new Promise(r => setTimeout(r, 600))
-  loading.value = false
+onMounted(() => {
+  fetchAll()
 })
 </script>
 

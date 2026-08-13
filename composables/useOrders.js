@@ -1,4 +1,4 @@
-import { OrderService } from '~/services/OrderService.js'
+import { SalesService } from '~/services/SalesService.js'
 import { ErrorMessages } from '~/constants/index.js'
 import { PaginationDefaults } from '~/constants/app.js'
 
@@ -15,7 +15,7 @@ export function useOrders() {
   const fetchOrders = async (filters = {}) => {
     loading.value = true
     try {
-      const result = await OrderService.getAll({ limit: PaginationDefaults.ADMIN_LIMIT, ...filters })
+      const result = await SalesService.getAll({ limit: PaginationDefaults.ADMIN_LIMIT, ...filters })
       orders.value = result.data
       total.value = result.total
     } catch (err) {
@@ -28,7 +28,7 @@ export function useOrders() {
   const fetchOrder = async (id) => {
     loading.value = true
     try {
-      order.value = await OrderService.getById(id)
+      order.value = await SalesService.getById(id)
     } catch (err) {
       showError(err.message || ErrorMessages.FETCH_FAILED)
     } finally {
@@ -39,7 +39,7 @@ export function useOrders() {
   const createOrder = async (data) => {
     saving.value = true
     try {
-      const result = await OrderService.create(data)
+      const result = await SalesService.create(data)
       orders.value = [result, ...orders.value]
       total.value += 1
       success('Order created successfully')
@@ -55,7 +55,8 @@ export function useOrders() {
   const updateOrder = async (id, data) => {
     saving.value = true
     try {
-      const result = await OrderService.update(id, data)
+      // We will need to implement SalesService.update
+      const result = await SalesService.update(id, data)
       const idx = orders.value.findIndex(o => o.id === id)
       if (idx !== -1) orders.value[idx] = result
       if (order.value?.id === id) order.value = result
@@ -72,12 +73,22 @@ export function useOrders() {
   const advanceOrderStatus = async (id, nextStatus, notes = '') => {
     saving.value = true
     try {
-      const result = await OrderService.updateStatus(id, nextStatus, notes)
+      const orderData = await SalesService.getById(id)
+      const history = [...(orderData.status_history || [])]
+      const now = new Date().toISOString()
+      if (!history.find(h => h.status === nextStatus)) {
+        history.push({ status: nextStatus, date: now, notes })
+      }
+      const result = await SalesService.updateOrderStatus(id, nextStatus, history)
+      
       const idx = orders.value.findIndex(o => o.id === id)
-      if (idx !== -1) orders.value[idx] = result
-      if (order.value?.id === id) order.value = result
+      // fetch updated order to replace
+      const updatedOrder = await SalesService.getById(id)
+      if (idx !== -1) orders.value[idx] = updatedOrder
+      if (order.value?.id === id) order.value = updatedOrder
+      
       success('Order status updated')
-      return result
+      return updatedOrder
     } catch (err) {
       showError(err.message || ErrorMessages.GENERIC)
       return null
@@ -88,7 +99,7 @@ export function useOrders() {
 
   const deleteOrder = async (id) => {
     try {
-      await OrderService.delete(id)
+      await SalesService.delete(id)
       orders.value = orders.value.filter(o => o.id !== id)
       total.value = Math.max(0, total.value - 1)
       success('Order deleted successfully')

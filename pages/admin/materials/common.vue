@@ -41,7 +41,11 @@ import { MaterialType } from '~/enums/materialType.js'
 import { MaterialUnit, MaterialUnitLabels } from '~/enums/materialUnit.js'
 import { StockStatusLabels, StockStatusColors } from '~/enums/stockStatus.js'
 import { formatCurrency } from '~/helpers/currency.js'
-import { getStockStatus } from '~/mock/materials.js'
+const getStockStatus = (material) => {
+  if (material.stock === 0) return 'out_of_stock'
+  if (material.stock <= material.min_stock_level) return 'low_stock'
+  return 'in_stock'
+}
 import { MaterialService } from '~/services/MaterialService.js'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })

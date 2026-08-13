@@ -21,7 +21,14 @@
 <script setup>
 import { Routes } from '~/constants/routes.js'
 import { PageTitles } from '~/constants/pageTitles.js'
-import { getProductDetails } from '~/mock/products.js'
+const getProductDetails = (id) => ({
+  target_margin: 40,
+  low_stock_threshold: 5,
+  materials: [],
+  stitching_cost: 0,
+  packaging_cost: 0,
+  other_cost: 0,
+})
 import { ProductService } from '~/services/ProductService.js'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })

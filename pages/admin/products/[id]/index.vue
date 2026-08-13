@@ -119,7 +119,14 @@ import { ProductStatus, ProductStatusLabels, ProductStatusColors } from '~/enums
 import { StockStatusLabels, StockStatusColors } from '~/enums/stockStatus.js'
 import { formatCurrency } from '~/helpers/currency.js'
 import { calcMaterialLineCost } from '~/helpers/profit.js'
-import { getProductDetails } from '~/mock/products.js'
+const getProductDetails = (id) => ({
+  target_margin: 40,
+  low_stock_threshold: 5,
+  materials: [],
+  stitching_cost: 1500,
+  packaging_cost: 200,
+  other_cost: 0,
+})
 import { getProductImageUrl } from '~/helpers/imageUrl.js'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })

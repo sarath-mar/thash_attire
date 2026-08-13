@@ -1,4 +1,4 @@
-import { getSupabaseClient } from './supabaseClient.js'
+import { getSupabaseClient, handleSupabaseError } from './supabaseClient.js'
 import { PaymentStatus } from '~/enums/index.js'
 
 function getDateRange(period) {
@@ -25,34 +25,26 @@ function getDateRange(period) {
 export const ReportService = {
   async getSalesReport(period = 'month', customFrom = null, customTo = null) {
     const supabase = getSupabaseClient()
+    if (!supabase) throw new Error('Supabase client not initialized')
     const { from, to } = period === 'custom' ? { from: customFrom, to: customTo } : getDateRange(period)
-
-    if (!supabase) {
-      return {
-        totalRevenue: 119797,
-        totalSales: 5,
-        totalDiscount: 500,
-        salesByDay: [],
-      }
-    }
 
     let query = supabase.from('sales').select('sale_date, final_amount, discount, payment_status, status')
     if (from) query = query.gte('sale_date', from)
     if (to) query = query.lte('sale_date', to)
 
     const { data, error } = await query
-    if (error) return { totalRevenue: 0, totalSales: 0, totalDiscount: 0, salesByDay: [] }
+    if (error) throw new Error(handleSupabaseError(error))
 
     const rows = data || []
-    const totalRevenue = rows.reduce((s, r) => s + (r.final_amount || 0), 0)
-    const totalDiscount = rows.reduce((s, r) => s + (r.discount || 0), 0)
+    const totalRevenue = rows.reduce((s, r) => s + (Number(r.final_amount) || 0), 0)
+    const totalDiscount = rows.reduce((s, r) => s + (Number(r.discount) || 0), 0)
 
     // Group by day
     const byDay = {}
     rows.forEach(r => {
       const day = r.sale_date?.slice(0, 10)
       if (!day) return
-      byDay[day] = (byDay[day] || 0) + (r.final_amount || 0)
+      byDay[day] = (byDay[day] || 0) + (Number(r.final_amount) || 0)
     })
     const salesByDay = Object.entries(byDay)
       .map(([date, amount]) => ({ date, amount }))
@@ -63,26 +55,20 @@ export const ReportService = {
 
   async getExpenseReport(period = 'month', customFrom = null, customTo = null) {
     const supabase = getSupabaseClient()
+    if (!supabase) throw new Error('Supabase client not initialized')
     const { from, to } = period === 'custom' ? { from: customFrom, to: customTo } : getDateRange(period)
 
-    if (!supabase) {
-      return {
-        totalExpenses: 73000,
-        byType: { material_purchase: 60000, courier: 2800, packaging: 3200, marketing: 5000, miscellaneous: 2000 },
-      }
-    }
-
-    let query = supabase.from('expenses').select('type, amount, expense_date')
-    if (from) query = query.gte('expense_date', from)
-    if (to) query = query.lte('expense_date', to)
+    let query = supabase.from('expenses').select('category, amount, date')
+    if (from) query = query.gte('date', from)
+    if (to) query = query.lte('date', to)
 
     const { data, error } = await query
-    if (error) return { totalExpenses: 0, byType: {} }
+    if (error) throw new Error(handleSupabaseError(error))
 
     const rows = data || []
-    const totalExpenses = rows.reduce((s, r) => s + (r.amount || 0), 0)
+    const totalExpenses = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0)
     const byType = {}
-    rows.forEach(r => { byType[r.type] = (byType[r.type] || 0) + (r.amount || 0) })
+    rows.forEach(r => { byType[r.category] = (byType[r.category] || 0) + (Number(r.amount) || 0) })
 
     return { totalExpenses, byType }
   },
@@ -104,15 +90,13 @@ export const ReportService = {
 
   async getInventoryReport() {
     const supabase = getSupabaseClient()
-    if (!supabase) {
-      return { totalProducts: 8, inStock: 5, lowStock: 2, outOfStock: 1 }
-    }
+    if (!supabase) throw new Error('Supabase client not initialized')
 
     const { data, error } = await supabase
       .from('products')
       .select('id, stock, status')
 
-    if (error) return { totalProducts: 0, inStock: 0, lowStock: 0, outOfStock: 0 }
+    if (error) throw new Error(handleSupabaseError(error))
 
     const rows = data || []
     const totalProducts = rows.length
@@ -125,17 +109,8 @@ export const ReportService = {
 
   async getCustomerReport(period = 'month', customFrom = null, customTo = null) {
     const supabase = getSupabaseClient()
+    if (!supabase) throw new Error('Supabase client not initialized')
     const { from, to } = period === 'custom' ? { from: customFrom, to: customTo } : getDateRange(period)
-
-    if (!supabase) {
-      return {
-        totalCustomers: 5,
-        topCustomers: [
-          { customer_name: 'Priya Sharma', total: 89500, orders: 5 },
-          { customer_name: 'Meena Iyer', total: 54999, orders: 3 },
-        ],
-      }
-    }
 
     const { data: custData } = await supabase.from('customers').select('id', { count: 'exact' })
     const totalCustomers = custData?.length || 0
@@ -154,7 +129,7 @@ export const ReportService = {
     ;(salesData || []).forEach(s => {
       const name = s.customer_name || 'Unknown'
       if (!customerMap[name]) customerMap[name] = { customer_name: name, total: 0, orders: 0 }
-      customerMap[name].total += s.final_amount || 0
+      customerMap[name].total += Number(s.final_amount) || 0
       customerMap[name].orders += 1
     })
 

@@ -1,20 +1,9 @@
 import { getSupabaseClient, handleSupabaseError } from './supabaseClient.js'
-import {
-  getMockAllMaterials,
-  getMockMaterialById,
-  createMockMaterial,
-  updateMockMaterial,
-  deleteMockMaterial,
-} from '~/mock/materialStore.js'
 
 export const MaterialService = {
   async getAll(search = '', type = null) {
     const supabase = getSupabaseClient()
-    if (!supabase) {
-      let result = getMockAllMaterials(search)
-      if (type) result = result.filter(m => m.type === type)
-      return result
-    }
+    if (!supabase) throw new Error('Supabase client not initialized')
 
     let query = supabase
       .from('materials')
@@ -27,16 +16,14 @@ export const MaterialService = {
     if (type) query = query.eq('type', type)
 
     const { data, error } = await query
-    if (error) {
-      console.warn('[MaterialService] getAll failed, using mock:', error.message)
-      return getMockAllMaterials(search)
-    }
+    if (error) throw new Error(handleSupabaseError(error))
+    
     return data || []
   },
 
   async getById(id) {
     const supabase = getSupabaseClient()
-    if (!supabase) return getMockMaterialById(id)
+    if (!supabase) throw new Error('Supabase client not initialized')
 
     const { data, error } = await supabase
       .from('materials')
@@ -44,13 +31,13 @@ export const MaterialService = {
       .eq('id', id)
       .single()
 
-    if (error) return getMockMaterialById(id)
+    if (error) throw new Error(handleSupabaseError(error))
     return data
   },
 
   async create(material) {
     const supabase = getSupabaseClient()
-    if (!supabase) return createMockMaterial(material)
+    if (!supabase) throw new Error('Supabase client not initialized')
 
     const { data, error } = await supabase
       .from('materials')
@@ -64,11 +51,11 @@ export const MaterialService = {
 
   async update(id, material) {
     const supabase = getSupabaseClient()
-    if (!supabase) return updateMockMaterial(id, material)
+    if (!supabase) throw new Error('Supabase client not initialized')
 
     const { data, error } = await supabase
       .from('materials')
-      .update({ ...material, updated_at: new Date().toISOString() })
+      .update(material)
       .eq('id', id)
       .select()
       .single()
@@ -79,10 +66,7 @@ export const MaterialService = {
 
   async delete(id) {
     const supabase = getSupabaseClient()
-    if (!supabase) {
-      deleteMockMaterial(id)
-      return
-    }
+    if (!supabase) throw new Error('Supabase client not initialized')
 
     const { error } = await supabase.from('materials').delete().eq('id', id)
     if (error) throw new Error(handleSupabaseError(error))

@@ -42,7 +42,12 @@
 
 <script setup>
 import { formatCurrency } from '~/helpers/currency.js'
-import { calcWeightedAvg } from '~/mock/materials.js'
+const calcWeightedAvg = (purchases) => {
+  if (!purchases || purchases.length === 0) return 0
+  const totalCost = purchases.reduce((sum, p) => sum + (Number(p.total_amount) || 0), 0)
+  const totalQty = purchases.reduce((sum, p) => sum + (Number(p.quantity) || 0), 0)
+  return totalQty > 0 ? totalCost / totalQty : 0
+}
 import { MaterialUnitShort } from '~/enums/materialUnit.js'
 
 const props = defineProps({
