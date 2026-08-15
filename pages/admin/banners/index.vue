@@ -6,7 +6,7 @@
     >
       <template #actions>
         <v-btn color="primary" variant="flat" prepend-icon="mdi-plus" @click="dialog = true">
-          Add Banner
+          Add Banner ->
         </v-btn>
       </template>
     </AdminPageHeader>
