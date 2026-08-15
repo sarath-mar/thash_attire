@@ -25,8 +25,14 @@
       </template>
 
       <template #[`item.product`]="{ item }">
-        <div class="text-truncate" style="max-width: 250px" :title="item.product_name">
-          {{ item.product_name }}
+        <div v-if="item.offer_id" class="d-flex align-center">
+          <v-chip size="x-small" color="primary" variant="flat" class="mr-2">Combo</v-chip>
+          <span class="text-truncate text-caption text-medium-emphasis" style="max-width: 200px">
+            {{ item.sale_items?.length }} Items
+          </span>
+        </div>
+        <div v-else class="text-truncate" style="max-width: 250px" :title="item.product_name || item.sale_items?.[0]?.product_name">
+          {{ item.product_name || item.sale_items?.[0]?.product_name || 'Multiple Items' }}
         </div>
       </template>
 

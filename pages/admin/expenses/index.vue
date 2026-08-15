@@ -66,8 +66,7 @@
       </template>
 
       <template #[`item.actions`]="{ item }">
-        <v-btn icon="mdi-pencil-outline" size="small" variant="text" />
-        <v-btn icon="mdi-delete-outline" size="small" variant="text" color="error" />
+        <v-btn icon="mdi-delete-outline" size="small" variant="text" color="error" @click="handleDelete(item.id)" />
       </template>
     </AdminDataTable>
 
@@ -99,16 +98,17 @@
 import { PageTitles } from '~/constants/pageTitles.js'
 import { formatCurrency } from '~/helpers/currency.js'
 import { formatDate } from '~/helpers/date.js'
+import { useExpenses } from '~/composables/useExpenses.js'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
 useHead({ title: PageTitles.ADMIN_EXPENSES || 'Expenses' })
 
-const loading = ref(true)
-const expenses = ref([])
+const { expenses, loading, saving, fetchExpenses, createExpense, deleteExpense } = useExpenses()
 const searchQuery = ref('')
 const filterCategory = ref('All')
 
 const dialog = ref(false)
+const formRef = ref(null)
 const form = reactive({ date: new Date().toISOString().split('T')[0], category: 'Other', amount: 0, description: '', notes: '' })
 
 const headers = [
@@ -119,7 +119,26 @@ const headers = [
   { title: '', key: 'actions', sortable: false, width: 80 },
 ]
 
-const summary = reactive({ today: 0, month: 0, total: 0 })
+const summary = computed(() => {
+  const now = new Date()
+  const todayStr = now.toISOString().split('T')[0]
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  
+  let today = 0
+  let month = 0
+  let total = 0
+  
+  expenses.value.forEach(e => {
+    const amt = Number(e.amount) || 0
+    total += amt
+    
+    const d = new Date(e.date)
+    if (d.toISOString().split('T')[0] === todayStr) today += amt
+    if (d >= startOfMonth) month += amt
+  })
+  
+  return { today, month, total }
+})
 
 const filteredExpenses = computed(() => {
   let result = expenses.value
@@ -131,27 +150,30 @@ const filteredExpenses = computed(() => {
   return result
 })
 
-const saveExpense = () => {
+const saveExpense = async () => {
   if (form.amount <= 0 || !form.description) return
-  const newExpense = {
-    id: `exp-${Date.now()}`,
+  
+  const payload = {
     ...form,
+    date: new Date(form.date).toISOString()
   }
-  expenses.value.unshift(newExpense)
-  summary.total += form.amount
-  dialog.value = false
+  
+  const res = await createExpense(payload)
+  if (res) {
+    dialog.value = false
+    formRef.value?.reset()
+    form.date = new Date().toISOString().split('T')[0]
+    form.category = 'Other'
+  }
+}
+
+const handleDelete = async (id) => {
+  if (confirm('Are you sure you want to delete this expense?')) {
+    await deleteExpense(id)
+  }
 }
 
 onMounted(() => {
-  // Mock data for expenses
-  expenses.value = [
-    { id: '1', date: new Date().toISOString(), category: 'Courier', description: 'Delhivery Shipping', amount: 450 },
-    { id: '2', date: new Date().toISOString(), category: 'Material Purchase', description: 'Lace and Buttons', amount: 1200 },
-    { id: '3', date: new Date(Date.now() - 86400000).toISOString(), category: 'Marketing', description: 'Instagram Ads', amount: 2000 },
-  ]
-  summary.today = 1650
-  summary.month = 3650
-  summary.total = 12500
-  loading.value = false
+  fetchExpenses()
 })
 </script>

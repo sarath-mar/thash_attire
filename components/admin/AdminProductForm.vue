@@ -137,6 +137,25 @@
       </div>
     </AdminFormSection>
 
+    <!-- Initial Showcase Sample -->
+    <AdminFormSection v-if="!initialData.initial_sample_created" title="Initial Showcase Sample" subtitle="First physical piece production">
+      <v-row dense>
+        <v-col cols="12">
+          <v-checkbox v-model="form.createInitialShowcaseSample" label="Create Initial Showcase Sample" color="primary" hide-details class="mb-2" />
+        </v-col>
+        <template v-if="form.createInitialShowcaseSample">
+          <v-col cols="12" md="6">
+            <v-text-field v-model.number="form.showcaseStitchingCost" label="Showcase Stitching Cost" type="number" prefix="₹" variant="outlined" density="comfortable" hint="Stitching cost for the initial showcase piece (materials are the same as regular production)" persistent-hint />
+          </v-col>
+        </template>
+      </v-row>
+    </AdminFormSection>
+    <AdminFormSection v-else title="Initial Showcase Sample" subtitle="First physical piece production">
+      <v-alert type="info" variant="tonal" class="mb-0">
+        Initial Showcase Sample has already been created for this product.
+      </v-alert>
+    </AdminFormSection>
+
     <!-- Pricing -->
     <AdminFormSection title="Pricing & Profit" subtitle="Selling price and margin analysis">
       <v-row dense>
@@ -177,12 +196,15 @@
     </AdminFormSection>
 
     <!-- Publishing -->
-    <AdminFormSection title="Publishing" subtitle="Featured and trending flags">
+    <AdminFormSection title="Publishing" subtitle="Visibility and availability settings">
       <v-row dense>
-        <v-col cols="12" md="6">
+        <v-col cols="12" md="4">
+          <v-switch v-model="form.is_showcase" label="Showcase Model (Hidden from public)" color="warning" hide-details />
+        </v-col>
+        <v-col cols="12" md="4">
           <v-switch v-model="form.is_featured" label="Featured Product" color="accent" hide-details />
         </v-col>
-        <v-col cols="12" md="6">
+        <v-col cols="12" md="4">
           <v-switch v-model="form.is_trending" label="Trending Product" color="accent" hide-details />
         </v-col>
       </v-row>
@@ -237,6 +259,10 @@ const defaultForm = () => ({
   low_stock_threshold: 5,
   is_featured: false,
   is_trending: false,
+  is_showcase: true,
+  initial_sample_created: false,
+  createInitialShowcaseSample: true,
+  showcaseStitchingCost: 0,
 })
 
 const form = reactive({ ...defaultForm(), ...props.initialData })

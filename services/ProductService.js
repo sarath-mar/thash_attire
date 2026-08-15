@@ -17,6 +17,7 @@ export const ProductService = {
       trending,
       sortBy = 'created_at',
       sortOrder = 'desc',
+      isAdmin = false,
     } = filters
 
     let query = supabase
@@ -28,6 +29,7 @@ export const ProductService = {
     if (featured != null) query = query.eq('is_featured', featured)
     if (trending != null) query = query.eq('is_trending', trending)
     if (search) query = query.or(`name.ilike.%${search}%,sku.ilike.%${search}%`)
+    if (!isAdmin) query = query.eq('is_showcase', false)
 
     query = query.order(sortBy, { ascending: sortOrder === 'asc' })
 
@@ -58,23 +60,30 @@ export const ProductService = {
     const supabase = getSupabaseClient()
     if (!supabase) throw new Error('Supabase client not initialized')
 
-    const { data, error } = await supabase
-      .from('products')
-      .insert(product)
-      .select()
-      .single()
+    const { materials, createInitialShowcaseSample, showcaseStitchingCost, target_margin, low_stock_threshold, stitching_cost, packaging_cost, other_cost, ...productData } = product
+
+    const { data: productId, error } = await supabase.rpc('create_product_with_sample', {
+      p_product: productData,
+      p_materials: materials || [],
+      p_create_sample: !!createInitialShowcaseSample,
+      p_showcase_stitching_cost: showcaseStitchingCost || 0
+    })
 
     if (error) throw new Error(handleSupabaseError(error))
-    return data
+    
+    // Fetch the created product to return
+    return this.getById(productId)
   },
 
   async update(id, product) {
     const supabase = getSupabaseClient()
     if (!supabase) throw new Error('Supabase client not initialized')
 
+    const { materials, createInitialShowcaseSample, target_margin, low_stock_threshold, stitching_cost, packaging_cost, other_cost, ...productData } = product
+
     const { data, error } = await supabase
       .from('products')
-      .update(product)
+      .update(productData)
       .eq('id', id)
       .select()
       .single()

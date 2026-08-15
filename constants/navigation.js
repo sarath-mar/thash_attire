@@ -24,6 +24,11 @@ export const AdminNavItems = Object.freeze([
     ],
   },
   {
+    title: 'Offers & Combos',
+    icon: 'mdi-tag-multiple-outline',
+    to: Routes.ADMIN_OFFERS,
+  },
+  {
     title: 'Inventory',
     icon: 'mdi-package-variant-closed',
     to: Routes.ADMIN_INVENTORY,

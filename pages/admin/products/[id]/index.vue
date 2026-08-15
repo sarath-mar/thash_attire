@@ -73,6 +73,23 @@
             </v-row>
           </v-card>
         </div>
+          
+          <v-card v-if="product.is_showcase || product.initial_sample_created" elevation="0" border rounded="lg" class="pa-4 mb-4">
+            <h3 class="text-subtitle-1 font-weight-semibold mb-2">Showcase & Sample</h3>
+            <v-row dense>
+              <v-col cols="12" v-if="product.is_showcase">
+                <v-alert type="warning" variant="tonal" density="compact" class="mb-3 text-caption">
+                  This product is a Showcase Model. It is hidden from the public website and cannot be purchased.
+                </v-alert>
+              </v-col>
+              <v-col cols="6" v-if="product.initial_sample_created">
+                <p class="text-caption">Initial Sample</p><strong>Created</strong>
+              </v-col>
+              <v-col cols="6" v-if="product.initial_sample_created">
+                <p class="text-caption">Showcase Stitching</p><strong>{{ formatCurrency(product.showcase_stitching_cost) }}</strong>
+              </v-col>
+            </v-row>
+          </v-card>
       </div>
 
       <!-- Description -->

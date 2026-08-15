@@ -10,12 +10,14 @@ export function useProducts() {
   const saving = ref(false)
   const error = ref(null)
   const { success, error: showError } = useSnackbar()
+  const route = useRoute()
 
   const fetchProducts = async (filters = {}) => {
     loading.value = true
     error.value = null
+    const isAdmin = route.path.startsWith('/admin')
     try {
-      const result = await ProductService.getAll(filters)
+      const result = await ProductService.getAll({ ...filters, isAdmin })
       products.value = result.data
       total.value = result.total
       return result

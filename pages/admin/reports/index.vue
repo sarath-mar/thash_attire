@@ -5,7 +5,7 @@
       subtitle="Analyze your business performance."
     >
       <template #actions>
-        <v-btn-toggle v-model="dateRange" mandatory density="compact" variant="outlined" color="primary">
+        <v-btn-toggle v-model="dateRange" mandatory density="compact" variant="outlined" color="primary" @update:model-value="fetchReports">
           <v-btn value="today">Today</v-btn>
           <v-btn value="week">This Week</v-btn>
           <v-btn value="month">This Month</v-btn>
@@ -14,7 +14,9 @@
       </template>
     </AdminPageHeader>
 
-    <v-card elevation="0" border rounded="lg" class="mb-4">
+    <AppLoading v-if="loading" />
+
+    <v-card v-else elevation="0" border rounded="lg" class="mb-4">
       <v-tabs v-model="activeTab" color="primary" align-tabs="start">
         <v-tab value="sales">Sales</v-tab>
         <v-tab value="products">Products Profit</v-tab>
@@ -26,33 +28,25 @@
         <v-window-item value="sales">
           <div class="pa-5">
             <v-row dense class="mb-4">
-              <v-col cols="12" md="3"><v-card border elevation="0" class="pa-4 text-center"><div class="text-caption text-medium-emphasis">Revenue</div><div class="text-h6">₹45,500</div></v-card></v-col>
-              <v-col cols="12" md="3"><v-card border elevation="0" class="pa-4 text-center"><div class="text-caption text-medium-emphasis">Orders</div><div class="text-h6">24</div></v-card></v-col>
-              <v-col cols="12" md="3"><v-card border elevation="0" class="pa-4 text-center"><div class="text-caption text-medium-emphasis">Products Sold</div><div class="text-h6">35</div></v-card></v-col>
-              <v-col cols="12" md="3"><v-card border elevation="0" class="pa-4 text-center"><div class="text-caption text-medium-emphasis">Avg. Order Value</div><div class="text-h6">₹1,895</div></v-card></v-col>
+              <v-col cols="12" md="3"><v-card border elevation="0" class="pa-4 text-center"><div class="text-caption text-medium-emphasis">Revenue</div><div class="text-h6">{{ formatCurrency(reportData.totalRevenue) }}</div></v-card></v-col>
+              <v-col cols="12" md="3"><v-card border elevation="0" class="pa-4 text-center"><div class="text-caption text-medium-emphasis">Orders</div><div class="text-h6">{{ reportData.totalSales }}</div></v-card></v-col>
+              <v-col cols="12" md="3"><v-card border elevation="0" class="pa-4 text-center"><div class="text-caption text-medium-emphasis">Normal Product Sales</div><div class="text-h6">{{ formatCurrency(reportData.normalSales) }}</div></v-card></v-col>
+              <v-col cols="12" md="3"><v-card border elevation="0" class="pa-4 text-center bg-primary-lighten-5"><div class="text-caption text-primary">Combo/Offer Sales</div><div class="text-h6 text-primary">{{ formatCurrency(reportData.comboSales) }}</div></v-card></v-col>
             </v-row>
-            <DashboardSalesChart :chart-data="[]" />
+            <DashboardSalesChart :chart-data="reportData.salesByDay || []" />
           </div>
         </v-window-item>
 
         <v-window-item value="products">
-          <v-table density="comfortable">
-            <thead><tr><th>Product</th><th>Cost</th><th>Selling Price</th><th>Profit</th><th>Margin</th></tr></thead>
-            <tbody>
-              <tr><td>Floral Summer Dress</td><td>₹850</td><td>₹1,499</td><td class="text-success">₹649</td><td>43.2%</td></tr>
-              <tr><td>Linen Trousers</td><td>₹600</td><td>₹1,100</td><td class="text-success">₹500</td><td>45.4%</td></tr>
-            </tbody>
-          </v-table>
+          <div class="pa-5 text-center text-medium-emphasis">
+            Coming soon in detailed reporting module.
+          </div>
         </v-window-item>
 
         <v-window-item value="inventory">
-          <v-table density="comfortable">
-            <thead><tr><th>Material</th><th>Quantity</th><th>Avg Cost</th><th>Inventory Value</th></tr></thead>
-            <tbody>
-              <tr><td>Cotton Fabric</td><td>45 m</td><td>₹150</td><td>₹6,750</td></tr>
-              <tr><td>Silk Thread</td><td>20 spools</td><td>₹45</td><td>₹900</td></tr>
-            </tbody>
-          </v-table>
+          <div class="pa-5 text-center text-medium-emphasis">
+            Coming soon in detailed reporting module.
+          </div>
         </v-window-item>
       </v-window>
     </v-card>
@@ -61,9 +55,30 @@
 
 <script setup>
 import { PageTitles } from '~/constants/pageTitles.js'
+import { formatCurrency } from '~/helpers/currency.js'
+import { ReportService } from '~/services/ReportService.js'
+
 definePageMeta({ layout: 'admin', middleware: 'admin' })
 useHead({ title: PageTitles.ADMIN_REPORTS || 'Reports' })
 
 const dateRange = ref('month')
 const activeTab = ref('sales')
+const loading = ref(true)
+const reportData = ref({})
+
+const fetchReports = async () => {
+  loading.value = true
+  try {
+    const res = await ReportService.getSalesReport(dateRange.value)
+    reportData.value = res
+  } catch (err) {
+    console.error(err)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  fetchReports()
+})
 </script>

@@ -28,7 +28,7 @@ export const ReportService = {
     if (!supabase) throw new Error('Supabase client not initialized')
     const { from, to } = period === 'custom' ? { from: customFrom, to: customTo } : getDateRange(period)
 
-    let query = supabase.from('sales').select('sale_date, final_amount, discount, payment_status, status')
+    let query = supabase.from('sales').select('sale_date, final_amount, discount, payment_status, status, offer_id')
     if (from) query = query.gte('sale_date', from)
     if (to) query = query.lte('sale_date', to)
 
@@ -36,8 +36,23 @@ export const ReportService = {
     if (error) throw new Error(handleSupabaseError(error))
 
     const rows = data || []
-    const totalRevenue = rows.reduce((s, r) => s + (Number(r.final_amount) || 0), 0)
-    const totalDiscount = rows.reduce((s, r) => s + (Number(r.discount) || 0), 0)
+    
+    let totalRevenue = 0
+    let totalDiscount = 0
+    let comboSales = 0
+    let normalSales = 0
+
+    rows.forEach(r => {
+      const amount = Number(r.final_amount) || 0
+      totalRevenue += amount
+      totalDiscount += Number(r.discount) || 0
+      
+      if (r.offer_id) {
+        comboSales += amount
+      } else {
+        normalSales += amount
+      }
+    })
 
     // Group by day
     const byDay = {}
@@ -50,7 +65,7 @@ export const ReportService = {
       .map(([date, amount]) => ({ date, amount }))
       .sort((a, b) => a.date.localeCompare(b.date))
 
-    return { totalRevenue, totalSales: rows.length, totalDiscount, salesByDay }
+    return { totalRevenue, totalSales: rows.length, totalDiscount, comboSales, normalSales, salesByDay }
   },
 
   async getExpenseReport(period = 'month', customFrom = null, customTo = null) {

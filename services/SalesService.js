@@ -9,12 +9,12 @@ export const SalesService = {
 
     let query = supabase
       .from('sales')
-      .select('*', { count: 'exact' })
+      .select('*, sale_items(*)', { count: 'exact' })
       .order('sale_date', { ascending: false })
 
     if (paymentStatus) query = query.eq('payment_status', paymentStatus)
     if (saleStatus) query = query.eq('status', saleStatus)
-    if (search) query = query.or(`customer_name.ilike.%${search}%,product_name.ilike.%${search}%,order_number.ilike.%${search}%`)
+    if (search) query = query.or(`customer_name.ilike.%${search}%,order_number.ilike.%${search}%`)
     if (dateFrom) query = query.gte('sale_date', dateFrom)
     if (dateTo) query = query.lte('sale_date', dateTo)
 
@@ -33,7 +33,7 @@ export const SalesService = {
 
     const { data, error } = await supabase
       .from('sales')
-      .select('*')
+      .select('*, sale_items(*), offer:offers(*, offer_items(*, product:products(*)))')
       .eq('id', id)
       .single()
 
@@ -41,29 +41,32 @@ export const SalesService = {
     return data
   },
 
-  async create(sale) {
+  async create(sale, items) {
     const supabase = getSupabaseClient()
     if (!supabase) throw new Error('Supabase client not initialized')
 
-    // Calculate final_amount
-    const subtotal = (sale.quantity || 1) * (sale.selling_price || 0)
-    const finalAmount = subtotal - (sale.discount || 0)
+    // Calculate final_amount if not provided
+    let finalAmount = sale.final_amount
+    if (finalAmount === undefined) {
+      const subtotal = items.reduce((sum, item) => sum + (item.selling_price * item.quantity), 0)
+      finalAmount = subtotal - (sale.discount || 0)
+    }
     
-    const payload = {
+    const payloadSale = {
       ...sale,
       final_amount: finalAmount,
       status: sale.status || SaleStatus.COMPLETED,
     }
 
-    const { data, error } = await supabase
-      .from('sales')
-      .insert(payload)
-      .select()
-      .single()
+    // Call RPC for atomic transaction
+    const { data, error } = await supabase.rpc('create_sale_transaction', {
+      p_sale: payloadSale,
+      p_items: items
+    })
 
     if (error) throw new Error(handleSupabaseError(error))
 
-    // Update customer totals
+    // Update customer totals (can run asynchronously, no transaction needed)
     if (sale.customer_id) {
       try {
         const custRes = await supabase
@@ -83,7 +86,7 @@ export const SalesService = {
       }
     }
 
-    return data
+    return this.getById(data.id)
   },
 
   async update(id, sale) {

@@ -53,31 +53,43 @@
             </div>
           </v-card>
 
-          <!-- Product Details -->
+          <!-- Product / Combo Details -->
           <v-card elevation="0" border rounded="lg" class="mb-4">
-            <v-card-title class="px-5 pt-5 pb-3 text-subtitle-1 font-weight-semibold">Product Details</v-card-title>
+            <v-card-title class="px-5 pt-5 pb-3 text-subtitle-1 font-weight-semibold">
+              {{ order.offer_id ? 'Combo Offer Details' : 'Product Details' }}
+            </v-card-title>
             <v-divider />
+            
+            <div v-if="order.offer" class="pa-4 bg-surface-variant">
+              <div class="d-flex align-center justify-space-between mb-1">
+                <span class="text-subtitle-1 font-weight-bold text-primary">{{ order.offer.name }}</span>
+                <span class="font-weight-bold">{{ formatCurrency(order.offer.offer_price) }}</span>
+              </div>
+              <div class="text-caption text-medium-emphasis">
+                Regular Total: <span class="text-decoration-line-through">{{ formatCurrency(order.sale_items?.reduce((sum, item) => sum + (item.product?.selling_price || 0), 0) || 0) }}</span>
+              </div>
+            </div>
+
             <v-table density="comfortable">
               <thead>
                 <tr>
                   <th>Product</th>
-                  <th>SKU</th>
-                  <th class="text-right">Price</th>
+                  <th class="text-right">Allocated Price</th>
                   <th class="text-right">Qty</th>
                   <th class="text-right">Total</th>
                 </tr>
               </thead>
               <tbody>
-                <tr>
+                <tr v-for="item in order.sale_items" :key="item.id">
                   <td>
-                    <NuxtLink :to="Routes.ADMIN_PRODUCT_DETAIL(order.product_id)" class="ta-link">
-                      {{ order.product_name }}
+                    <NuxtLink :to="Routes.ADMIN_PRODUCT_DETAIL(item.product_id)" class="ta-link">
+                      {{ item.product_name }}
                     </NuxtLink>
+                    <v-chip v-if="order.offer_id" size="x-small" color="primary" variant="flat" class="ml-2">Combo Item</v-chip>
                   </td>
-                  <td><span class="text-caption text-medium-emphasis">{{ order.product_sku }}</span></td>
-                  <td class="text-right">{{ formatCurrency(order.selling_price) }}</td>
-                  <td class="text-right">{{ order.quantity }}</td>
-                  <td class="text-right"><strong>{{ formatCurrency(order.selling_price * order.quantity) }}</strong></td>
+                  <td class="text-right">{{ formatCurrency(item.selling_price) }}</td>
+                  <td class="text-right">{{ item.quantity }}</td>
+                  <td class="text-right"><strong>{{ formatCurrency(item.selling_price * item.quantity) }}</strong></td>
                 </tr>
               </tbody>
             </v-table>
@@ -90,22 +102,20 @@
             <div class="pa-5">
               <v-row>
                 <v-col cols="12" md="6">
-                  <div class="ta-cost-row"><span>Selling Amount</span><span>{{ formatCurrency(order.total_amount) }}</span></div>
-                  <div class="ta-cost-row text-medium-emphasis"><span>Product Cost</span><span>{{ formatCurrency(order.product_cost) }}</span></div>
-                  <div class="ta-cost-row text-medium-emphasis"><span>Packaging Cost</span><span>{{ formatCurrency(order.packaging_cost) }}</span></div>
-                  <div class="ta-cost-row text-medium-emphasis"><span>Other Costs</span><span>{{ formatCurrency(order.other_cost) }}</span></div>
+                  <div class="ta-cost-row"><span>Selling Amount</span><span>{{ formatCurrency(order.total_amount || order.final_amount) }}</span></div>
+                  <div class="ta-cost-row text-medium-emphasis"><span>Total Product Cost</span><span>{{ formatCurrency(totalCost) }}</span></div>
                   <v-divider class="my-2" />
-                  <div class="ta-cost-row font-weight-medium"><span>Total Cost</span><span>{{ formatCurrency(order.total_cost) }}</span></div>
+                  <div class="ta-cost-row font-weight-medium"><span>Total Cost</span><span>{{ formatCurrency(totalCost) }}</span></div>
                 </v-col>
                 <v-col cols="12" md="6">
                   <div class="ta-profit-box">
                     <div class="ta-profit-box__item">
                       <span class="text-caption">Profit</span>
-                      <strong class="text-success text-h6">{{ formatCurrency(order.profit) }}</strong>
+                      <strong class="text-success text-h6">{{ formatCurrency(profit) }}</strong>
                     </div>
                     <div class="ta-profit-box__item">
                       <span class="text-caption">Profit Margin</span>
-                      <strong class="text-success text-h6">{{ order.profit_margin }}%</strong>
+                      <strong class="text-success text-h6">{{ profitMargin }}%</strong>
                     </div>
                   </div>
                 </v-col>
@@ -146,9 +156,16 @@
             </div>
           </v-card>
 
-          <!-- Delivery -->
+          <!-- Delivery & Dates -->
           <v-card elevation="0" border rounded="lg" class="pa-5">
-            <h3 class="text-subtitle-1 font-weight-semibold mb-3">Delivery</h3>
+            <div class="d-flex align-center justify-space-between mb-3">
+              <h3 class="text-subtitle-1 font-weight-semibold">Dates & Delivery</h3>
+              <v-btn icon="mdi-pencil-outline" size="x-small" variant="text" @click="openDateEdit" />
+            </div>
+            <div class="ta-sidebar-info">
+              <span class="ta-sidebar-info__label">Order Date</span>
+              <span class="ta-sidebar-info__value">{{ order.order_date ? formatDate(order.order_date) : (order.sale_date ? formatDate(order.sale_date) : '—') }}</span>
+            </div>
             <div class="ta-sidebar-info">
               <span class="ta-sidebar-info__label">Expected</span>
               <span class="ta-sidebar-info__value">{{ order.expected_delivery ? formatDate(order.expected_delivery) : '—' }}</span>
@@ -164,6 +181,24 @@
           </v-card>
         </div>
       </div>
+
+      <v-dialog v-model="dateDialog" max-width="400">
+        <v-card>
+          <v-card-title class="pa-4">Edit Order Date</v-card-title>
+          <v-divider />
+          <v-card-text class="pa-4">
+            <v-form @submit.prevent="saveOrderDate">
+              <CommonAppDatePicker v-model="dateForm.order_date" label="Order Date" variant="outlined" density="comfortable" class="mb-4" />
+            </v-form>
+          </v-card-text>
+          <v-divider />
+          <v-card-actions class="pa-4">
+            <v-spacer />
+            <v-btn variant="text" @click="dateDialog = false">Cancel</v-btn>
+            <v-btn color="primary" variant="flat" :loading="savingDate" @click="saveOrderDate">Save</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
     </template>
 
     <AppEmptyState
@@ -192,6 +227,33 @@ useHead({ title: PageTitles.ADMIN_ORDER_DETAIL })
 const route = useRoute()
 const loading = ref(true)
 const order = ref(null)
+
+const dateDialog = ref(false)
+const savingDate = ref(false)
+const dateForm = reactive({ order_date: '' })
+
+const openDateEdit = () => {
+  if (order.value) {
+    const d = order.value.order_date || order.value.sale_date
+    dateForm.order_date = d ? new Date(d).toISOString().split('T')[0] : ''
+    dateDialog.value = true
+  }
+}
+
+const saveOrderDate = async () => {
+  savingDate.value = true
+  try {
+    const updated = await SalesService.update(order.value.id, {
+      order_date: dateForm.order_date ? new Date(dateForm.order_date).toISOString() : null
+    })
+    order.value.order_date = updated.order_date
+    dateDialog.value = false
+  } catch (err) {
+    // Error handling
+  } finally {
+    savingDate.value = false
+  }
+}
 
 const currentStepIndex = computed(() => {
   if (!order.value) return 0
@@ -239,6 +301,24 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+})
+
+const totalCost = computed(() => {
+  if (!order.value || !order.value.sale_items) return 0
+  return order.value.sale_items.reduce((sum, item) => sum + (item.cost_price * item.quantity), 0)
+})
+
+const profit = computed(() => {
+  if (!order.value) return 0
+  const revenue = order.value.final_amount || order.value.total_amount || 0
+  return Math.max(0, revenue - totalCost.value)
+})
+
+const profitMargin = computed(() => {
+  if (!order.value) return 0
+  const revenue = order.value.final_amount || order.value.total_amount || 0
+  if (revenue <= 0) return 0
+  return Math.round((profit.value / revenue) * 100)
 })
 </script>
 

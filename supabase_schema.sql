@@ -121,6 +121,7 @@ CREATE TABLE sales (
   payment_status TEXT DEFAULT 'pending',
   status TEXT DEFAULT 'order_received',
   sale_date TIMESTAMPTZ DEFAULT NOW(),
+  order_date TIMESTAMPTZ DEFAULT NOW(),
   expected_delivery TIMESTAMPTZ,
   actual_delivery TIMESTAMPTZ,
   shipping_address TEXT,

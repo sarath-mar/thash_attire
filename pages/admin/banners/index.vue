@@ -27,7 +27,7 @@
     <v-row v-else dense class="ta-admin-banners__grid">
       <v-col v-for="banner in banners" :key="banner.id" cols="12" md="6" lg="4">
         <v-card elevation="0" border rounded="lg" class="ta-banner-card">
-          <v-img :src="banner.image" height="180" cover class="align-end bg-grey-lighten-2">
+          <v-img :src="banner.image_url" height="180" cover class="align-end bg-grey-lighten-2">
             <div class="ta-banner-card__overlay pa-3">
               <h3 class="text-white text-subtitle-1 font-weight-bold mb-1">{{ banner.title }}</h3>
               <p v-if="banner.subtitle" class="text-white text-caption">{{ banner.subtitle }}</p>
@@ -53,8 +53,8 @@
 
           <v-card-actions class="px-3 py-2">
             <v-spacer />
-            <v-btn size="small" variant="text" prepend-icon="mdi-pencil-outline">Edit</v-btn>
-            <v-btn size="small" variant="text" color="error" prepend-icon="mdi-delete-outline">Delete</v-btn>
+            <v-btn size="small" variant="text" prepend-icon="mdi-pencil-outline" @click="editBanner(banner)">Edit</v-btn>
+            <v-btn size="small" variant="text" color="error" prepend-icon="mdi-delete-outline" @click="handleDelete(banner.id)">Delete</v-btn>
           </v-card-actions>
         </v-card>
       </v-col>
@@ -62,7 +62,7 @@
 
     <v-dialog v-model="dialog" max-width="600" scrollable>
       <v-card>
-        <v-card-title class="pa-4">Add Banner</v-card-title>
+        <v-card-title class="pa-4">{{ form.id ? 'Edit Banner' : 'Add Banner' }}</v-card-title>
         <v-divider />
         <v-card-text class="pa-4">
           <v-form ref="formRef">
@@ -89,8 +89,8 @@
         <v-divider />
         <v-card-actions class="pa-4">
           <v-spacer />
-          <v-btn variant="text" @click="dialog = false">Cancel</v-btn>
-          <v-btn color="primary" variant="flat" @click="dialog = false">Save Banner</v-btn>
+          <v-btn variant="text" @click="closeDialog">Cancel</v-btn>
+          <v-btn color="primary" variant="flat" :loading="saving" @click="saveBanner">Save Banner</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -100,15 +100,20 @@
 <script setup>
 import { PageTitles } from '~/constants/pageTitles.js'
 
+import { useBanners } from '~/composables/useBanners.js'
+import { StorageService } from '~/services/StorageService.js'
+
 definePageMeta({ layout: 'admin', middleware: 'admin' })
 useHead({ title: PageTitles.ADMIN_BANNERS || 'Banners' })
 
-const loading = ref(true)
-const banners = ref([])
+const { banners, loading, saving, fetchAllBanners, createBanner, updateBanner, deleteBanner } = useBanners()
 const dialog = ref(false)
+const formRef = ref(null)
 
-const form = reactive({
+const defaultForm = {
+  id: null,
   image: [],
+  image_url: '',
   title: '',
   subtitle: '',
   button_text: '',
@@ -117,23 +122,76 @@ const form = reactive({
   end_date: '',
   display_order: 1,
   status: 'active'
-})
+}
+
+const form = reactive({ ...defaultForm })
+
+const editBanner = (banner) => {
+  Object.assign(form, {
+    id: banner.id,
+    image: [],
+    image_url: banner.image_url,
+    title: banner.title || '',
+    subtitle: banner.subtitle || '',
+    button_text: banner.button_text || '',
+    button_link: banner.link || '',
+    start_date: banner.start_date ? banner.start_date.split('T')[0] : '',
+    end_date: banner.end_date ? banner.end_date.split('T')[0] : '',
+    display_order: banner.display_order || 1,
+    status: banner.status || 'active'
+  })
+  dialog.value = true
+}
+
+const closeDialog = () => {
+  dialog.value = false
+  Object.assign(form, defaultForm)
+}
+
+const saveBanner = async () => {
+  let finalImageUrl = form.image_url
+  
+  // Handle image upload if a new file is selected
+  if (form.image && form.image.length > 0) {
+    const file = form.image[0]
+    if (file instanceof File) {
+      const path = `banner_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+      finalImageUrl = await StorageService.uploadBannerImage(path, file)
+    }
+  }
+
+  const payload = {
+    title: form.title,
+    subtitle: form.subtitle,
+    image_url: finalImageUrl,
+    button_text: form.button_text,
+    link: form.button_link, // Mapped button_link to link in DB
+    start_date: form.start_date ? new Date(form.start_date).toISOString() : null,
+    end_date: form.end_date ? new Date(form.end_date).toISOString() : null,
+    display_order: form.display_order,
+    status: form.status
+  }
+
+  let success = false
+  if (form.id) {
+    success = await updateBanner(form.id, payload)
+  } else {
+    success = await createBanner(payload)
+  }
+
+  if (success) {
+    closeDialog()
+  }
+}
+
+const handleDelete = async (id) => {
+  if (confirm('Are you sure you want to delete this banner?')) {
+    await deleteBanner(id)
+  }
+}
 
 onMounted(() => {
-  // Mock data for banners
-  banners.value = [
-    {
-      id: '1',
-      title: 'Summer Collection',
-      subtitle: 'Up to 30% off on all summer wear',
-      image: 'https://images.unsplash.com/photo-1523381294911-8d3cead13475?q=80&w=2070',
-      status: 'active',
-      display_order: 1,
-      button_text: 'Shop Now',
-      button_link: '/category/summer'
-    }
-  ]
-  loading.value = false
+  fetchAllBanners()
 })
 </script>
 

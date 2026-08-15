@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS sales (
   payment_status TEXT DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'partial', 'refunded')),
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'cancelled', 'refunded')),
   sale_date TIMESTAMPTZ DEFAULT NOW(),
+  order_date TIMESTAMPTZ DEFAULT NOW(),
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
