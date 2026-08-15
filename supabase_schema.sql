@@ -66,6 +66,7 @@ CREATE TABLE materials (
   min_stock_level NUMERIC(10, 2) NOT NULL DEFAULT 0,
   unit TEXT NOT NULL,
   avg_unit_cost NUMERIC(10, 2) NOT NULL DEFAULT 0,
+  notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -84,6 +85,7 @@ CREATE TABLE material_purchases (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   material_id UUID REFERENCES materials(id) ON DELETE CASCADE,
   quantity NUMERIC(10, 2) NOT NULL DEFAULT 0,
+  unit TEXT,
   unit_cost NUMERIC(10, 2) NOT NULL DEFAULT 0,
   total_amount NUMERIC(10, 2) NOT NULL DEFAULT 0,
   purchase_date TIMESTAMPTZ DEFAULT NOW(),

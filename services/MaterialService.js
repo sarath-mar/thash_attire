@@ -18,7 +18,11 @@ export const MaterialService = {
     const { data, error } = await query
     if (error) throw new Error(handleSupabaseError(error))
     
-    return data || []
+    return (data || []).map(m => ({
+      ...m,
+      current_stock: m.stock,
+      total_inventory_value: (m.stock || 0) * (m.avg_unit_cost || 0),
+    }))
   },
 
   async getById(id) {

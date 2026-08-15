@@ -36,7 +36,7 @@
       />
       <v-row dense>
         <v-col cols="6">
-          <v-text-field v-model="form.purchase_date" label="Purchase Date *" type="date" variant="outlined" density="comfortable" />
+          <CommonAppDatePicker v-model="form.purchase_date" label="Purchase Date *" variant="outlined" density="comfortable" />
         </v-col>
         <v-col cols="6">
           <v-text-field v-model="form.supplier" label="Supplier" variant="outlined" density="comfortable" />
