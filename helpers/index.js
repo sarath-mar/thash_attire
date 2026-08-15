@@ -8,3 +8,11 @@ export { searchItems, highlightMatch } from './search.js'
 export { sortBy, sortByDate, sortByName } from './sorting.js'
 export { filterByField, filterByFields, filterByPriceRange } from './filtering.js'
 export { paginate, getPaginationRange } from './pagination.js'
+export {
+  calcProfit,
+  calcProfitMargin,
+  calcRecommendedPrice,
+  calcMaterialLineCost,
+  calcWeightedAvg,
+  meetsTargetMargin,
+} from './profit.js'

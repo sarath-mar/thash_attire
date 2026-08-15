@@ -37,6 +37,11 @@ CREATE TABLE IF NOT EXISTS products (
   category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
   selling_price DECIMAL(10, 2) NOT NULL DEFAULT 0,
   cost_price DECIMAL(10, 2) DEFAULT 0,
+  stitching_cost DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  packaging_cost DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  other_cost DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  low_stock_threshold INT NOT NULL DEFAULT 5,
+  target_margin DECIMAL(5, 2) NOT NULL DEFAULT 40,
   sizes TEXT[] DEFAULT '{}',
   colors TEXT[] DEFAULT '{}',
   stock INT DEFAULT 0,
@@ -54,15 +59,38 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE TABLE IF NOT EXISTS materials (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'product' CHECK (type IN ('product', 'common')),
   supplier TEXT,
-  purchase_date DATE,
-  quantity DECIMAL(10, 2) DEFAULT 0,
-  unit TEXT DEFAULT 'meter' CHECK (unit IN ('meter', 'piece', 'kg', 'roll', 'yard')),
-  cost_per_unit DECIMAL(10, 2) DEFAULT 0,
-  total_cost DECIMAL(10, 2) GENERATED ALWAYS AS (quantity * cost_per_unit) STORED,
+  stock DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  min_stock_level DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  unit TEXT NOT NULL DEFAULT 'meter' CHECK (unit IN ('meter', 'piece', 'kg', 'roll', 'yard')),
+  avg_unit_cost DECIMAL(10, 2) NOT NULL DEFAULT 0,
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ─── Product Materials (BOM) ────────────────────────────────
+CREATE TABLE IF NOT EXISTS product_materials (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  product_id UUID REFERENCES products(id) ON DELETE CASCADE,
+  material_id UUID REFERENCES materials(id) ON DELETE CASCADE,
+  quantity_required DECIMAL(10, 2) NOT NULL DEFAULT 1,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ─── Material Purchases ─────────────────────────────────────
+CREATE TABLE IF NOT EXISTS material_purchases (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  material_id UUID REFERENCES materials(id) ON DELETE CASCADE,
+  quantity DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  unit TEXT,
+  unit_cost DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  total_amount DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  purchase_date TIMESTAMPTZ DEFAULT NOW(),
+  supplier TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ─── Customers ──────────────────────────────────────────────
@@ -151,6 +179,8 @@ ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE materials ENABLE ROW LEVEL SECURITY;
+ALTER TABLE product_materials ENABLE ROW LEVEL SECURITY;
+ALTER TABLE material_purchases ENABLE ROW LEVEL SECURITY;
 ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
@@ -179,6 +209,16 @@ CREATE POLICY "Admin full access on categories" ON categories
   );
 
 CREATE POLICY "Admin full access on materials" ON materials
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin')
+  );
+
+CREATE POLICY "Admin full access on product_materials" ON product_materials
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin')
+  );
+
+CREATE POLICY "Admin full access on material_purchases" ON material_purchases
   FOR ALL USING (
     EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin')
   );

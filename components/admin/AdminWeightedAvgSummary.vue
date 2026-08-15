@@ -42,12 +42,7 @@
 
 <script setup>
 import { formatCurrency } from '~/helpers/currency.js'
-const calcWeightedAvg = (purchases) => {
-  if (!purchases || purchases.length === 0) return 0
-  const totalCost = purchases.reduce((sum, p) => sum + (Number(p.total_amount) || 0), 0)
-  const totalQty = purchases.reduce((sum, p) => sum + (Number(p.quantity) || 0), 0)
-  return totalQty > 0 ? totalCost / totalQty : 0
-}
+import { calcWeightedAvg } from '~/helpers/profit.js'
 import { MaterialUnitShort } from '~/enums/materialUnit.js'
 
 const props = defineProps({
@@ -62,8 +57,9 @@ const result = computed(() =>
   calcWeightedAvg(props.existingStock, props.existingAvg, props.newQty, props.newTotalCost),
 )
 
+const existingValue = computed(() => result.value.existingValue)
 const unitShort = computed(() => MaterialUnitShort[props.unit] || props.unit)
-const unitLabel = computed(() => props.unit ? ` ${unitShort.value}` : '')
+const unitLabel = computed(() => (props.unit ? ` ${unitShort.value}` : ''))
 </script>
 
 <style scoped lang="scss">

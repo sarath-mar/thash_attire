@@ -16,7 +16,6 @@
       </AdminPageHeader>
 
       <div class="ta-admin-product-detail__layout">
-        <!-- Left: Images -->
         <div class="ta-admin-product-detail__gallery">
           <v-card elevation="0" border rounded="lg" class="ta-admin-product-detail__main-image">
             <v-img :src="activeImage" aspect-ratio="3/4" cover />
@@ -35,7 +34,6 @@
           <AdminVideoUpload v-if="product.videos?.length" :model-value="product.videos[0]" label="Product Video" />
         </div>
 
-        <!-- Right: Info -->
         <div class="ta-admin-product-detail__info">
           <v-card elevation="0" border rounded="lg" class="pa-4 mb-4">
             <div class="d-flex align-center gap-2 mb-3">
@@ -59,7 +57,7 @@
             <AdminProfitSummary
               :selling-price="product.selling_price"
               :total-cost="product.cost_price"
-              :target-margin="details.target_margin"
+              :target-margin="product.target_margin"
               class="mt-4"
             />
           </v-card>
@@ -68,41 +66,50 @@
             <h3 class="text-subtitle-1 font-weight-semibold mb-2">Inventory</h3>
             <v-row dense>
               <v-col cols="4"><p class="text-caption">Stock</p><strong>{{ product.stock }}</strong></v-col>
-              <v-col cols="4"><p class="text-caption">Low Stock At</p><strong>{{ details.low_stock_threshold }}</strong></v-col>
+              <v-col cols="4"><p class="text-caption">Low Stock At</p><strong>{{ product.low_stock_threshold }}</strong></v-col>
               <v-col cols="4"><p class="text-caption">Status</p><AdminStatusChip :status="stockStatus" :label-map="StockStatusLabels" :color-map="StockStatusColors" /></v-col>
             </v-row>
           </v-card>
-        </div>
-          
+
           <v-card v-if="product.is_showcase || product.initial_sample_created" elevation="0" border rounded="lg" class="pa-4 mb-4">
             <h3 class="text-subtitle-1 font-weight-semibold mb-2">Showcase & Sample</h3>
             <v-row dense>
-              <v-col cols="12" v-if="product.is_showcase">
+              <v-col v-if="product.is_showcase" cols="12">
                 <v-alert type="warning" variant="tonal" density="compact" class="mb-3 text-caption">
                   This product is a Showcase Model. It is hidden from the public website and cannot be purchased.
                 </v-alert>
               </v-col>
-              <v-col cols="6" v-if="product.initial_sample_created">
+              <v-col v-if="product.initial_sample_created" cols="6">
                 <p class="text-caption">Initial Sample</p><strong>Created</strong>
               </v-col>
-              <v-col cols="6" v-if="product.initial_sample_created">
+              <v-col v-if="product.initial_sample_created" cols="6">
                 <p class="text-caption">Showcase Stitching</p><strong>{{ formatCurrency(product.showcase_stitching_cost) }}</strong>
               </v-col>
             </v-row>
           </v-card>
+        </div>
       </div>
 
-      <!-- Description -->
       <AdminFormSection title="Description" class="mt-4">
-        <p class="ta-admin-product-detail__description">{{ product.description }}</p>
+        <p class="ta-admin-product-detail__description">{{ product.description || '—' }}</p>
       </AdminFormSection>
 
-      <!-- Materials -->
       <AdminFormSection title="Materials" subtitle="Materials required per unit">
         <v-table density="compact">
-          <thead><tr><th>Material</th><th>Quantity</th><th>Unit</th><th>Unit Cost</th><th>Total</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Material</th>
+              <th>Quantity</th>
+              <th>Unit</th>
+              <th>Unit Cost</th>
+              <th>Total</th>
+            </tr>
+          </thead>
           <tbody>
-            <tr v-for="mat in details.materials" :key="mat.material_id">
+            <tr v-if="!product.materials?.length">
+              <td colspan="5" class="text-medium-emphasis">No materials linked.</td>
+            </tr>
+            <tr v-for="mat in product.materials" :key="mat.material_id">
               <td>{{ mat.name }}</td>
               <td>{{ mat.quantity }}</td>
               <td>{{ mat.unit }}</td>
@@ -113,7 +120,6 @@
         </v-table>
       </AdminFormSection>
 
-      <!-- Cost Breakdown -->
       <AdminFormSection title="Cost Breakdown">
         <div class="ta-admin-product-detail__costs">
           <div v-for="item in costItems" :key="item.label" class="ta-admin-product-detail__cost-row">
@@ -136,14 +142,6 @@ import { ProductStatus, ProductStatusLabels, ProductStatusColors } from '~/enums
 import { StockStatusLabels, StockStatusColors } from '~/enums/stockStatus.js'
 import { formatCurrency } from '~/helpers/currency.js'
 import { calcMaterialLineCost } from '~/helpers/profit.js'
-const getProductDetails = (id) => ({
-  target_margin: 40,
-  low_stock_threshold: 5,
-  materials: [],
-  stitching_cost: 1500,
-  packaging_cost: 200,
-  other_cost: 0,
-})
 import { getProductImageUrl } from '~/helpers/imageUrl.js'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
@@ -157,23 +155,23 @@ useHead({ title: PageTitles.ADMIN_PRODUCT_DETAIL })
 const { product, loading, fetchProduct, updateProduct } = useProducts()
 
 const activeImage = ref('')
-const details = computed(() => getProductDetails(product.value?.id))
 
 const stockStatus = computed(() => {
   if (!product.value) return 'in_stock'
   if (product.value.stock === 0) return 'out_of_stock'
-  if (product.value.stock <= (details.value.low_stock_threshold || 5)) return 'low_stock'
+  if (product.value.stock <= (product.value.low_stock_threshold || 5)) return 'low_stock'
   return 'in_stock'
 })
 
 const costItems = computed(() => {
-  const d = details.value
-  const matCost = (d.materials || []).reduce((s, m) => s + calcMaterialLineCost(m.quantity, m.unit_cost), 0)
+  const p = product.value
+  if (!p) return []
+  const matCost = (p.materials || []).reduce((s, m) => s + calcMaterialLineCost(m.quantity, m.unit_cost), 0)
   return [
     { label: 'Material Cost', value: matCost },
-    { label: 'Stitching Cost', value: d.stitching_cost || 0 },
-    { label: 'Packaging Cost', value: d.packaging_cost || 0 },
-    { label: 'Other Cost', value: d.other_cost || 0 },
+    { label: 'Stitching Cost', value: p.stitching_cost || 0 },
+    { label: 'Packaging Cost', value: p.packaging_cost || 0 },
+    { label: 'Other Cost', value: p.other_cost || 0 },
   ]
 })
 

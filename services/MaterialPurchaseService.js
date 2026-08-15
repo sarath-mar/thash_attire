@@ -1,5 +1,10 @@
 import { getSupabaseClient, handleSupabaseError } from './supabaseClient.js'
 
+function mapPurchase(p) {
+  if (!p) return p
+  return { ...p, material_name: p.materials?.name || p.material_name || '' }
+}
+
 export const MaterialPurchaseService = {
   async getAll(materialId = null, search = '') {
     const supabase = getSupabaseClient()
@@ -15,8 +20,8 @@ export const MaterialPurchaseService = {
 
     const { data, error } = await query
     if (error) throw new Error(handleSupabaseError(error))
-    
-    return (data || []).map(p => ({ ...p, material_name: p.materials?.name || '' }))
+
+    return (data || []).map(mapPurchase)
   },
 
   async create(purchase) {
@@ -25,6 +30,10 @@ export const MaterialPurchaseService = {
 
     const totalCost = Number(purchase.total_amount) || 0
     const quantity = Number(purchase.quantity) || 0
+    if (!purchase.material_id) throw new Error('Material is required')
+    if (quantity <= 0) throw new Error('Quantity must be greater than 0')
+    if (totalCost < 0) throw new Error('Total amount cannot be negative')
+
     const unitCost = quantity > 0 ? totalCost / quantity : 0
 
     const { data, error } = await supabase.rpc('record_material_purchase', {
@@ -40,7 +49,6 @@ export const MaterialPurchaseService = {
 
     if (error) throw new Error(handleSupabaseError(error))
 
-    // RPC returns { id } — fetch full record with material join so the list shows correct data
     const newId = data?.id
     if (!newId) return data
 
@@ -51,14 +59,16 @@ export const MaterialPurchaseService = {
       .single()
 
     if (fetchError) throw new Error(handleSupabaseError(fetchError))
-    return { ...full, material_name: full.materials?.name || '' }
+    return mapPurchase(full)
   },
 
   async delete(id) {
     const supabase = getSupabaseClient()
     if (!supabase) throw new Error('Supabase client not initialized')
 
-    const { error } = await supabase.from('material_purchases').delete().eq('id', id)
+    const { error } = await supabase.rpc('delete_material_purchase', {
+      p_purchase_id: id,
+    })
     if (error) throw new Error(handleSupabaseError(error))
   },
 }

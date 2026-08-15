@@ -21,6 +21,7 @@
         <AdminStatusChip :status="getStockStatus(item)" :label-map="StockStatusLabels" :color-map="StockStatusColors" />
       </template>
       <template #[`item.actions`]="{ item }">
+        <v-btn icon="mdi-eye-outline" size="small" variant="text" :to="Routes.ADMIN_MATERIAL_DETAIL(item.id)" />
         <v-btn icon="mdi-pencil-outline" size="small" variant="text" @click="openDialog(item)" />
       </template>
     </AdminDataTable>
@@ -42,8 +43,9 @@ import { MaterialUnit, MaterialUnitLabels } from '~/enums/materialUnit.js'
 import { StockStatusLabels, StockStatusColors } from '~/enums/stockStatus.js'
 import { formatCurrency } from '~/helpers/currency.js'
 const getStockStatus = (material) => {
-  if (material.stock === 0) return 'out_of_stock'
-  if (material.stock <= material.min_stock_level) return 'low_stock'
+  const stock = Number(material.current_stock ?? material.stock) || 0
+  if (stock === 0) return 'out_of_stock'
+  if (stock <= (Number(material.min_stock_level) || 0)) return 'low_stock'
   return 'in_stock'
 }
 import { MaterialService } from '~/services/MaterialService.js'
@@ -65,7 +67,7 @@ const headers = [
   { title: 'Avg Cost', key: 'avg_unit_cost' },
   { title: 'Inventory Value', key: 'total_inventory_value' },
   { title: 'Status', key: 'status', sortable: false },
-  { title: '', key: 'actions', sortable: false, width: 56 },
+  { title: '', key: 'actions', sortable: false, width: 100 },
 ]
 
 const unitOptions = Object.entries(MaterialUnitLabels).map(([value, label]) => ({ value, label }))
@@ -80,9 +82,28 @@ const onSearch = async (q) => {
   materials.value = await MaterialService.getAll(q, MaterialType.COMMON)
 }
 
+const blankForm = () => ({
+  name: '',
+  unit: MaterialUnit.PIECE,
+  supplier: '',
+  min_stock_level: 20,
+  type: MaterialType.COMMON,
+})
+
 const openDialog = (mat = null) => {
   editing.value = mat
-  Object.assign(form, mat || { name: '', unit: MaterialUnit.PIECE, supplier: '', min_stock_level: 20, type: MaterialType.COMMON })
+  Object.assign(
+    form,
+    mat
+      ? {
+          name: mat.name || '',
+          unit: mat.unit || MaterialUnit.PIECE,
+          supplier: mat.supplier || '',
+          min_stock_level: mat.min_stock_level ?? 20,
+          type: MaterialType.COMMON,
+        }
+      : blankForm(),
+  )
   dialogOpen.value = true
 }
 

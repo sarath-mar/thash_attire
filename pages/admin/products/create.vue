@@ -21,14 +21,6 @@
 <script setup>
 import { Routes } from '~/constants/routes.js'
 import { PageTitles } from '~/constants/pageTitles.js'
-const getProductDetails = (id) => ({
-  target_margin: 40,
-  low_stock_threshold: 5,
-  materials: [],
-  stitching_cost: 0,
-  packaging_cost: 0,
-  other_cost: 0,
-})
 import { ProductService } from '~/services/ProductService.js'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
@@ -42,7 +34,7 @@ const loadingInitial = ref(false)
 const initialData = ref({})
 
 const handleSubmit = async (data) => {
-  const result = await createProduct({ ...data, cost_price: data.cost_price })
+  const result = await createProduct(data)
   if (result) router.push(Routes.ADMIN_PRODUCT_DETAIL(result.id))
 }
 
@@ -51,18 +43,23 @@ const goBack = () => router.push(Routes.ADMIN_PRODUCTS)
 onMounted(async () => {
   if (route.query.duplicate) {
     loadingInitial.value = true
-    const source = await ProductService.getById(route.query.duplicate)
-    const details = getProductDetails(source.id)
-    initialData.value = {
-      ...source,
-      ...details,
-      id: undefined,
-      sku: `${source.sku}-COPY`,
-      name: `${source.name} (Copy)`,
-      video: source.videos?.[0] || null,
-      images: source.images || [],
+    try {
+      const source = await ProductService.getById(route.query.duplicate)
+      initialData.value = {
+        ...source,
+        id: undefined,
+        sku: `${source.sku}-COPY`,
+        name: `${source.name} (Copy)`,
+        video: source.video || source.videos?.[0] || null,
+        images: source.images || [],
+        materials: source.materials || [],
+        initial_sample_created: false,
+        createInitialShowcaseSample: true,
+        stock: 0,
+      }
+    } finally {
+      loadingInitial.value = false
     }
-    loadingInitial.value = false
   }
 })
 </script>

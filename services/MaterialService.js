@@ -1,6 +1,39 @@
 import { getSupabaseClient, handleSupabaseError } from './supabaseClient.js'
 
+const MATERIAL_WRITE_FIELDS = [
+  'name',
+  'type',
+  'supplier',
+  'unit',
+  'min_stock_level',
+  'notes',
+]
+
+function mapMaterial(m) {
+  if (!m) return m
+  return {
+    ...m,
+    current_stock: m.stock,
+    total_inventory_value: (Number(m.stock) || 0) * (Number(m.avg_unit_cost) || 0),
+  }
+}
+
+function sanitizeMaterialPayload(material) {
+  const payload = {}
+  for (const key of MATERIAL_WRITE_FIELDS) {
+    if (material[key] !== undefined) payload[key] = material[key]
+  }
+  if (payload.min_stock_level != null) {
+    payload.min_stock_level = Number(payload.min_stock_level) || 0
+  }
+  if (payload.supplier === '') payload.supplier = null
+  if (payload.notes === '') payload.notes = null
+  return payload
+}
+
 export const MaterialService = {
+  mapMaterial,
+
   async getAll(search = '', type = null) {
     const supabase = getSupabaseClient()
     if (!supabase) throw new Error('Supabase client not initialized')
@@ -17,12 +50,8 @@ export const MaterialService = {
 
     const { data, error } = await query
     if (error) throw new Error(handleSupabaseError(error))
-    
-    return (data || []).map(m => ({
-      ...m,
-      current_stock: m.stock,
-      total_inventory_value: (m.stock || 0) * (m.avg_unit_cost || 0),
-    }))
+
+    return (data || []).map(mapMaterial)
   },
 
   async getById(id) {
@@ -36,7 +65,7 @@ export const MaterialService = {
       .single()
 
     if (error) throw new Error(handleSupabaseError(error))
-    return data
+    return mapMaterial(data)
   },
 
   async create(material) {
@@ -45,12 +74,12 @@ export const MaterialService = {
 
     const { data, error } = await supabase
       .from('materials')
-      .insert(material)
+      .insert(sanitizeMaterialPayload(material))
       .select()
       .single()
 
     if (error) throw new Error(handleSupabaseError(error))
-    return data
+    return mapMaterial(data)
   },
 
   async update(id, material) {
@@ -59,13 +88,13 @@ export const MaterialService = {
 
     const { data, error } = await supabase
       .from('materials')
-      .update(material)
+      .update(sanitizeMaterialPayload(material))
       .eq('id', id)
       .select()
       .single()
 
     if (error) throw new Error(handleSupabaseError(error))
-    return data
+    return mapMaterial(data)
   },
 
   async delete(id) {

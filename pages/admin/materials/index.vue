@@ -58,8 +58,9 @@ import { MaterialUnit, MaterialUnitLabels } from '~/enums/materialUnit.js'
 import { StockStatusLabels, StockStatusColors } from '~/enums/stockStatus.js'
 import { formatCurrency } from '~/helpers/currency.js'
 const getStockStatus = (material) => {
-  if (material.stock === 0) return 'out_of_stock'
-  if (material.stock <= material.min_stock_level) return 'low_stock'
+  const stock = Number(material.current_stock ?? material.stock) || 0
+  if (stock === 0) return 'out_of_stock'
+  if (stock <= (Number(material.min_stock_level) || 0)) return 'low_stock'
   return 'in_stock'
 }
 
@@ -106,9 +107,30 @@ const filteredMaterials = computed(() => {
   return result
 })
 
+const blankForm = () => ({
+  name: '',
+  unit: MaterialUnit.METER,
+  supplier: '',
+  min_stock_level: 10,
+  notes: '',
+  type: MaterialType.PRODUCT,
+})
+
 const openDialog = (mat = null) => {
   editing.value = mat
-  Object.assign(form, mat || { name: '', unit: MaterialUnit.METER, supplier: '', min_stock_level: 10, notes: '', type: MaterialType.PRODUCT })
+  Object.assign(
+    form,
+    mat
+      ? {
+          name: mat.name || '',
+          unit: mat.unit || MaterialUnit.METER,
+          supplier: mat.supplier || '',
+          min_stock_level: mat.min_stock_level ?? 10,
+          notes: mat.notes || '',
+          type: mat.type || MaterialType.PRODUCT,
+        }
+      : blankForm(),
+  )
   dialogOpen.value = true
 }
 

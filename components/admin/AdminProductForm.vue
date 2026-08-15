@@ -303,8 +303,8 @@ function onMaterialSelect(row, materialId) {
   if (mat) {
     row.name = mat.name
     row.unit = mat.unit
-    row.unit_cost = mat.avg_unit_cost
-    row.available_stock = mat.current_stock
+    row.unit_cost = Number(mat.avg_unit_cost) || 0
+    row.available_stock = Number(mat.current_stock ?? mat.stock) || 0
   }
 }
 
@@ -315,14 +315,31 @@ async function handleSubmit() {
     ...form,
     cost_price: totalCost.value,
     videos: form.video ? [form.video] : [],
+    materials: form.materials
+      .filter(m => m.material_id)
+      .map(m => ({
+        material_id: m.material_id,
+        name: m.name,
+        quantity: Number(m.quantity) || 0,
+        unit: m.unit,
+        unit_cost: Number(m.unit_cost) || 0,
+        available_stock: Number(m.available_stock) || 0,
+      })),
   })
 }
 
 onMounted(async () => {
   categories.value = await CategoryService.getAll()
   productMaterials.value = await MaterialService.getAll('', MaterialType.PRODUCT)
-  if (!form.materials.length && props.initialData.materials?.length) {
-    form.materials = [...props.initialData.materials]
+  if (props.initialData?.materials?.length) {
+    form.materials = props.initialData.materials.map(m => ({
+      material_id: m.material_id,
+      name: m.name || '',
+      quantity: Number(m.quantity) || 0,
+      unit: m.unit || '',
+      unit_cost: Number(m.unit_cost) || 0,
+      available_stock: Number(m.available_stock) || 0,
+    }))
   }
 })
 </script>

@@ -32,6 +32,25 @@ export function calcMaterialLineCost(quantity, avgUnitCost) {
   return Math.round(qty * cost * 100) / 100
 }
 
+/** Weighted average after adding a purchase to existing stock. */
+export function calcWeightedAvg(existingStock, existingAvg, newQty, newTotalCost) {
+  const stock = Number(existingStock) || 0
+  const avg = Number(existingAvg) || 0
+  const qty = Number(newQty) || 0
+  const totalCost = Number(newTotalCost) || 0
+  const newStock = stock + qty
+  const existingValue = stock * avg
+  const totalValue = existingValue + totalCost
+  const newAvgCost = newStock > 0 ? totalValue / newStock : 0
+
+  return {
+    existingValue: Math.round(existingValue * 100) / 100,
+    newStock: Math.round(newStock * 100) / 100,
+    totalValue: Math.round(totalValue * 100) / 100,
+    newAvgCost: Math.round(newAvgCost * 100) / 100,
+  }
+}
+
 export function meetsTargetMargin(sellingPrice, totalCost, targetMarginPercent) {
   const currentMargin = calcProfitMargin(sellingPrice, totalCost)
   return currentMargin >= Number(targetMarginPercent)

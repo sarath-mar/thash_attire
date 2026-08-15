@@ -79,6 +79,7 @@ definePageMeta({ layout: 'admin', middleware: 'admin' })
 useHead({ title: PageTitles.ADMIN_MATERIAL_PURCHASES })
 
 const { purchases, loading, fetchPurchases, createPurchase, deletePurchase, saving } = useMaterialPurchases()
+const { error: showError } = useSnackbar()
 
 const allMaterials = ref([])
 const dialogOpen = ref(false)
@@ -114,13 +115,33 @@ const onMaterialSelect = (id) => {
 const onSearch = (q) => fetchPurchases(null, q)
 
 const savePurchase = async () => {
+  if (!form.material_id) {
+    showError('Please select a material')
+    return
+  }
+  if (!form.quantity || form.quantity <= 0) {
+    showError('Quantity must be greater than 0')
+    return
+  }
+  if (form.total_amount == null || form.total_amount < 0) {
+    showError('Enter a valid total purchase amount')
+    return
+  }
+
   const result = await createPurchase({
     ...form,
     unit: selectedMaterial.value?.unit,
   })
   if (result) {
     dialogOpen.value = false
-    Object.assign(form, { material_id: null, quantity: null, total_amount: null, supplier: '', notes: '' })
+    Object.assign(form, {
+      material_id: null,
+      purchase_date: formatDateApi(new Date()),
+      quantity: null,
+      total_amount: null,
+      supplier: '',
+      notes: '',
+    })
     selectedMaterial.value = null
     allMaterials.value = await MaterialService.getAll()
   }
@@ -129,9 +150,12 @@ const savePurchase = async () => {
 const confirmDelete = (p) => { purchaseToDelete.value = p; deleteDialog.value = true }
 const handleDelete = async () => {
   deleting.value = true
-  await deletePurchase(purchaseToDelete.value.id)
+  const ok = await deletePurchase(purchaseToDelete.value.id)
   deleting.value = false
   deleteDialog.value = false
+  if (ok) {
+    allMaterials.value = await MaterialService.getAll()
+  }
 }
 
 onMounted(async () => {
