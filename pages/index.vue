@@ -480,12 +480,10 @@ const applyMotion = () => {
 
   const pages = board.querySelectorAll('.ed-sec')
   const stageH = root.clientHeight
-  if (board.dataset.stageH !== String(stageH)) {
-    board.dataset.stageH = String(stageH)
-    pages.forEach((section) => {
-      section.style.minHeight = `${stageH}px`
-    })
-  }
+  pages.forEach((section, index) => {
+    if (index === 0 || index === pages.length - 1) return
+    section.style.minHeight = ''
+  })
 
   const limit = Math.max(0, board.scrollHeight - root.clientHeight)
 
@@ -1072,8 +1070,25 @@ onUnmounted(() => {
 .ed-sec {
   box-sizing: border-box;
   margin: 0;
-  padding: 40px 48px 32px;
+  padding: 28px 48px 12px;
   background: var(--ed-bg);
+}
+
+.ed-sec + .ed-sec {
+  margin-top: 72px;
+}
+
+#pricing,
+#reviews,
+#faq {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+#reviews h2 {
+  max-width: 16em;
+  font-size: clamp(34px, 4vw, 56px);
 }
 
 .ed-lab {
@@ -1118,17 +1133,19 @@ h2 {
 
 .ed-hero-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 28px;
-  align-items: end;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 32px;
+  align-items: stretch;
   flex: 1;
   min-height: 0;
   width: 100%;
+  height: 100%;
 }
 
 .ed-hero-copy {
   min-width: 0;
   align-self: start;
+  padding-top: 12px;
 }
 
 .ed-hero-grid p {
@@ -1190,36 +1207,36 @@ h2 {
   background: var(--ed-card);
   border: 1.5px dashed var(--ed-line);
   border-radius: 26px;
-  padding: 16px;
+  padding: 16px 16px 14px;
   text-align: center;
   perspective: 700px;
-  height: auto;
+  height: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
-  align-self: end;
+  align-self: stretch;
 }
 
 .ed-photo-wrap {
   position: relative;
-  width: min(100%, 420px);
-  height: min(42vh, 420px);
-  flex: 0 0 auto;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
   border-radius: 18px;
   overflow: hidden;
   margin: 0 auto 10px;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
 }
 
 .ed-photo {
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  object-position: center center;
+  object-fit: cover;
+  object-position: center 72%;
   display: block;
 }
 
@@ -1374,9 +1391,9 @@ h2 {
 }
 
 .ed-price {
-  max-width: 340px;
+  max-width: 480px;
   border-radius: 22px;
-  padding: 34px;
+  padding: 40px 42px;
   text-align: center;
 
   h2 {
@@ -1709,7 +1726,7 @@ h2 {
   }
 
   .ed-sec {
-    padding: 28px 22px 24px;
+    padding: 22px 22px 8px;
   }
 
   .ed-line {
