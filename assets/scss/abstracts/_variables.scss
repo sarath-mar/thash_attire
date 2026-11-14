@@ -1,33 +1,33 @@
 // ─── CSS Custom Properties (Theme Colors) ───────────────────────────────────
 :root {
-  // Brand
-  --color-primary: #121212;
-  --color-primary-light: #242424;
-  --color-secondary: #7e674b;
-  --color-accent: #c5a059;
-  --color-accent-hover: #d4af37;
-  --color-accent-light: #f4ebd9;
-  --color-accent-gold-grad: linear-gradient(135deg, #c5a059 0%, #e5c378 50%, #b89146 100%);
-  --color-gold-glow: rgba(197, 160, 89, 0.25);
+  // Brand — warm ivory, ink, and muted rose
+  --color-primary: #231a1d;
+  --color-primary-light: #3a2c30;
+  --color-secondary: #6f6063;
+  --color-accent: #d9707a;
+  --color-accent-hover: #c45d68;
+  --color-accent-light: #f5d5d3;
+  --color-accent-gold-grad: linear-gradient(135deg, #d9707a 0%, #e9a3a8 100%);
+  --color-gold-glow: rgba(217, 112, 122, 0.22);
 
   // Backgrounds
-  --color-bg: #faf8f5;
-  --color-bg-alt: #f4efea;
-  --color-surface: #ffffff;
-  --color-surface-elevated: #ffffff;
-  --color-surface-translucent: rgba(255, 255, 255, 0.85);
+  --color-bg: #fbf4ec;
+  --color-bg-alt: #f1d9a0;
+  --color-surface: #fffcf7;
+  --color-surface-elevated: #fffcf7;
+  --color-surface-translucent: rgba(255, 252, 247, 0.9);
 
   // Text
-  --color-text-primary: #121212;
-  --color-text-secondary: #5a5a5a;
-  --color-text-muted: #8e8e8e;
-  --color-text-inverse: #ffffff;
-  --color-text-gold: #c5a059;
+  --color-text-primary: #231a1d;
+  --color-text-secondary: #6f6063;
+  --color-text-muted: #6f6063;
+  --color-text-inverse: #fbf4ec;
+  --color-text-gold: #d9707a;
 
   // Borders
-  --color-border: #e6dfd5;
-  --color-border-light: #f0eae1;
-  --color-border-gold: rgba(197, 160, 89, 0.4);
+  --color-border: #f0b9bd;
+  --color-border-light: #f0b9bd;
+  --color-border-gold: #f0b9bd;
 
   // Glassmorphism
   --glass-bg: rgba(255, 255, 255, 0.88);
@@ -50,11 +50,12 @@
   --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 12px 36px rgba(0, 0, 0, 0.1);
   --shadow-xl: 0 20px 50px rgba(0, 0, 0, 0.15);
-  --shadow-gold: 0 8px 24px rgba(197, 160, 89, 0.2);
+  --shadow-gold: 0 8px 24px rgba(217, 112, 122, 0.18);
 
   // Typography
   --font-heading: 'Cormorant Garamond', Georgia, serif;
-  --font-body: 'Montserrat', sans-serif;
+  --font-body: 'Jost', sans-serif;
+  --font-script: 'Dancing Script', cursive;
 
   // Spacing
   --spacing-xs: 4px;
@@ -67,10 +68,10 @@
   --spacing-4xl: 96px;
 
   // Border Radius
-  --radius-sm: 2px;
-  --radius-md: 4px;
-  --radius-lg: 8px;
-  --radius-xl: 16px;
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 22px;
+  --radius-xl: 26px;
   --radius-full: 9999px;
 
   // Transitions

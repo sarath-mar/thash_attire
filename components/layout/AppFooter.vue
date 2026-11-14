@@ -5,12 +5,11 @@
         <!-- Brand Info -->
         <div class="ta-footer__brand">
           <NuxtLink to="/" class="ta-footer__logo-group">
-            <span class="ta-footer__logo">THASH ATTIRE</span>
-            <span class="ta-footer__sub">BOUTIQUE HAUTE COUTURE</span>
+            <span class="ta-footer__logo">Thash Attire</span>
+            <span class="ta-footer__sub">Made with love, mom’s care</span>
           </NuxtLink>
           <p class="ta-footer__tagline">
-            Celebrating the heritage of Indian craftsmanship with modern elegance.
-            Curated silk sarees, designer gowns, and bespoke bridal wear.
+            Your dress, cut and stitched for you. No bulk. No stock sizes. Every piece starts from your measurements.
           </p>
           <div class="ta-footer__social">
             <a
@@ -106,7 +105,7 @@ const instagramUrl = computed(() => config.public.instagramUrl || 'https://insta
   background: var(--color-primary);
   color: var(--color-text-inverse);
   padding-top: var(--spacing-4xl);
-  border-top: 1px solid rgba(197, 160, 89, 0.3);
+  border-top: 1px solid rgba(240, 185, 189, 0.35);
 
   &__grid {
     display: grid;
@@ -132,18 +131,21 @@ const instagramUrl = computed(() => config.public.instagramUrl || 'https://insta
   }
 
   &__logo {
-    font-family: var(--font-heading);
-    font-size: 1.6rem;
-    font-weight: 600;
-    letter-spacing: 0.18em;
+    font-family: var(--font-script);
+    font-size: 2.2rem;
+    font-weight: 500;
+    letter-spacing: 0;
     color: #ffffff;
   }
 
   &__sub {
-    font-size: 0.55rem;
-    letter-spacing: 0.3em;
-    color: var(--color-accent);
-    font-weight: 600;
+    font-family: "Cormorant Garamond", Georgia, serif;
+    font-style: italic;
+    font-size: 1.05rem;
+    letter-spacing: 0;
+    text-transform: none;
+    color: #f0b9bd;
+    font-weight: 500;
   }
 
   &__tagline {
@@ -162,7 +164,7 @@ const instagramUrl = computed(() => config.public.instagramUrl || 'https://insta
     @include flex-center;
     width: 38px;
     height: 38px;
-    border: 1px solid rgba(197, 160, 89, 0.4);
+    border: 1px solid rgba(240, 185, 189, 0.55);
     border-radius: var(--radius-full);
     color: var(--color-accent);
     @include transition(background, border-color);

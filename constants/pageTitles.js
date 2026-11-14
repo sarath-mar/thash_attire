@@ -1,5 +1,5 @@
 export const PageTitles = Object.freeze({
-  HOME: 'Thash Attire — Premium Women\'s Fashion',
+  HOME: 'Thash Attire — Made with love, mom’s care',
   PRODUCTS: 'Shop Collection',
   PRODUCT_DETAIL: 'Product Details',
   ABOUT: 'About Us',

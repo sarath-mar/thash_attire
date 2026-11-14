@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Thash Attire — Made with love, mom’s care</title>
+<meta name="description" content="Your dress, cut & stitched for you. No bulk. No stock sizes. Every Thash dress is made after your measurements, one at a time.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Dancing+Script:wght@500&family=Jost:wght@400;500;600&display=swap">
+<style>
+:root{--bg:#fbf4ec;--card:#fffcf7;--ink:#231a1d;--mute:#6f6063;--rose:#d9707a;--line:#f0b9bd;--yel:#f1d9a0;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1c1517;--card:#271e21;--ink:#f6ece4;--mute:#bfaeb0;--line:#6b3b40}}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:400 15px/1.6 Jost,sans-serif;overflow:hidden}
+h1,h2,h3{font-family:"Cormorant Garamond",Georgia,serif;font-weight:700;margin:0;line-height:1.05}
+a{color:inherit;text-decoration:none}.mono{font-family:Jost,monospace}
+.frame{position:fixed;inset:calc(18px + env(safe-area-inset-top,0px)) 18px calc(18px + env(safe-area-inset-bottom,0px));border:4px dotted var(--ink);border-radius:30px;overflow:hidden}
+.left{position:absolute;left:0;top:0;bottom:0;width:30%;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:44px 20px 48px;text-align:center;z-index:3}
+.logo{font:500 40px "Dancing Script",cursive;color:var(--rose);display:block}
+.tag{font:400 13px/1.5 Jost,monospace;margin:14px 0 20px}
+.br{font:700 13px Jost,monospace}.br:hover{color:var(--rose)}
+.nav{display:flex;flex-direction:column;gap:20px;font:700 12px Jost,monospace}
+.nav a{display:flex;flex-direction:column;align-items:center;gap:6px}
+.nav i{width:20px;height:20px;border:2px solid var(--ink);border-radius:50%;transition:.3s}
+.nav a.on i{background:var(--rose);border-color:var(--rose);transform:scale(1.15)}
+#line{position:absolute;left:30%;bottom:0;width:0;border-left:4px dotted var(--ink);z-index:2}
+#sci{position:absolute;left:calc(30% - 18px);width:36px;z-index:4;pointer-events:none}
+.sc{position:absolute;left:30%;right:0;top:0;bottom:0;overflow-y:auto;scroll-behavior:smooth;padding:0 56px 140px 56px;scrollbar-width:none}
+.sc::-webkit-scrollbar{display:none}
+.sec{padding:56px 0}
+.lab{font:500 21px "Dancing Script",cursive;color:var(--rose);display:block;margin-bottom:4px}
+h2{font-size:clamp(30px,4vw,46px);margin-bottom:28px}
+.hero h1{font-size:clamp(52px,7vw,100px);letter-spacing:-.01em;margin:10px 0 26px}
+.hero h1 em{font-style:normal;color:var(--rose);border-bottom:4px solid var(--rose)}
+.hg{display:grid;grid-template-columns:1fr 1fr;gap:34px;align-items:center}
+.hg p{color:var(--mute);max-width:330px;margin:0 0 22px}
+.btn{display:inline-block;border:1.5px solid var(--ink);border-radius:99px;padding:12px 22px;font:700 13px Jost,monospace;color:var(--ink);background:none;cursor:pointer;transition:.3s;margin:0 8px 8px 0}
+.btn:hover{background:var(--ink);color:var(--bg)}.btn.r{background:var(--rose);border-color:var(--rose);color:#fff}.btn.d{background:var(--ink);color:var(--bg)}
+.panel{background:var(--card);border:1.5px dashed var(--line);border-radius:26px;padding:20px;text-align:center;perspective:700px}
+.panel svg{width:100%;max-height:300px;display:block;transition:transform .15s}
+.sc2{font:500 20px "Dancing Script",cursive;color:var(--rose)}
+.pills{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:8px 0}
+.pills span{border:1.5px solid var(--ink);border-radius:99px;padding:6px 12px;font:700 11px Jost,monospace}.pills span:last-child{background:var(--ink);color:var(--bg)}
+.swt{display:flex;gap:9px;justify-content:center;align-items:center;font-size:11px;color:var(--mute)}
+.swt i{width:20px;height:20px;border-radius:50%;cursor:pointer;display:inline-block;transition:transform .2s}.swt i:hover{transform:scale(1.25)}
+.zz{margin:10px -56px 0;background:var(--yel)}.zz .bar{height:12px;background:var(--ink)}.zz svg{display:block;width:100%;height:24px}
+.g4{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.c4{background:var(--card);border:1.5px dashed var(--line);border-radius:18px;padding:20px;transition:transform .3s}.c4:hover{transform:translateY(-5px)}
+.c4 b{font:700 36px "Cormorant Garamond";color:var(--rose);display:block}.c4 h3{font-size:18px;margin:4px 0}.c4 p{margin:0;font-size:13px;color:var(--mute)}
+.work{display:grid;grid-template-columns:1.1fr .9fr;gap:30px;align-items:center}
+.wk{aspect-ratio:1.2;border-radius:22px;border:1.5px dashed #d8b46a;display:grid;place-items:center;position:relative;transition:background .5s;background:#f1d9a0}
+.wk svg{height:80%}.wk small{position:absolute;top:12px;left:12px;background:#fff;color:#333;border-radius:99px;padding:3px 11px;font-size:11px}
+.work h3{font-size:36px;margin:4px 0 10px}.pr{font:700 20px "Cormorant Garamond";margin-bottom:8px}
+.ar{width:42px;height:42px;border-radius:50%;border:1.5px solid var(--ink);background:none;color:var(--ink);font-size:17px;cursor:pointer;margin-right:8px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.c3{border-radius:18px;padding:22px;color:#2a1d20}.c3 h3{font-size:18px;margin-bottom:8px}.c3 p{margin:0;font-size:13px;color:#5a4a4d}
+.price{max-width:340px;background:var(--card);border:1.5px dashed var(--line);border-radius:22px;padding:34px;text-align:center}
+.price h2{font-size:44px;margin:6px 0}.price ul{list-style:none;padding:0;text-align:left;font-size:13px;margin:18px 0}.price li:before{content:"✦ ";color:var(--rose)}
+.rev h2{font-size:clamp(24px,3vw,34px);margin-bottom:12px}
+details{border-top:1.5px dashed var(--line);padding:18px 0}details:last-of-type{border-bottom:1.5px dashed var(--line)}
+summary{font-weight:600;cursor:pointer;list-style:none;display:flex;justify-content:space-between}summary::after{content:"+";color:var(--rose);font-size:18px}details[open] summary::after{content:"–"}
+details p{color:var(--mute);margin:8px 0 0;font-size:13px}
+.contact{background:#231a1d;color:#fbf4ec;border-radius:24px;text-align:center;padding:50px 16px}.contact h2{font-size:clamp(28px,4vw,44px);margin-bottom:20px}.contact .btn{border:0}
+.ft{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:34px 0;font-size:12px;align-items:center}
+.rv{opacity:0;transform:translateY(28px);transition:opacity .8s,transform .8s cubic-bezier(.2,.7,.2,1)}.rv.in{opacity:1;transform:none}
+#tri{position:absolute;right:0;bottom:0;width:min(190px,40vw);aspect-ratio:1;z-index:6;transition:transform .5s,opacity .5s}
+#tri svg{width:100%;height:100%;display:block;transform-origin:100% 100%;transition:transform .35s}#tri a:hover svg{transform:scale(1.1)}
+#tri text{font-family:Jost,monospace;fill:#fff;font-weight:700}#triok{position:absolute;right:8px;bottom:6px;background:none;border:0;color:#fff;font:700 16px Jost,monospace;cursor:pointer;line-height:1}
+@media(max-width:860px){.frame{inset:8px;border-radius:20px}.left{width:100%;bottom:auto;height:62px;flex-direction:row;padding:8px 16px;background:var(--bg);justify-content:space-between}.logo{font-size:30px}.sc{left:0;top:62px;padding:0 20px 120px}.hg,.work,.g3,.g4{grid-template-columns:1fr}.zz{margin:10px -20px 0}#tri{width:140px}}
+@media(prefers-reduced-motion:reduce){.rv{opacity:1;transform:none}.sc{scroll-behavior:auto}}
+
+h1,h2,h3{font-weight:600}body{font-size:16px}
+.tag,.br,.nav,.btn,.pills span,#triok,.swt{letter-spacing:.12em;text-transform:uppercase}.btn,.br,.nav{font-size:11.5px;font-weight:600}.tag{font-size:11px}
+.lab{font:italic 500 24px "Cormorant Garamond",serif}.c4 h3,.c3 h3{font-size:22px}
+#cd,#cr{position:fixed;left:0;top:0;pointer-events:none;z-index:60;opacity:0;display:none}
+#cd{width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:var(--ink)}
+#cr{width:36px;height:36px;margin:-18px 0 0 -18px;border-radius:50%;border:1.5px solid var(--ink);transition:width .25s,height .25s,margin .25s,background .25s}
+#cr.h{width:62px;height:62px;margin:-31px 0 0 -31px;background:color-mix(in srgb,var(--ink) 9%,transparent)}
+@media(hover:hover){#cd,#cr{display:block}*{cursor:none!important}}
+.cats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.cat{all:unset;box-sizing:border-box;display:block;border-radius:20px;padding:14px;background:var(--card);border:1.5px dashed var(--line);transition:transform .35s;cursor:pointer}
+.cat:hover{transform:translateY(-6px)}.cat:focus-visible{outline:2px solid var(--rose)}
+.cat .tile{aspect-ratio:3/4;border-radius:14px;display:grid;place-items:center;margin-bottom:12px}.cat svg{width:46%}
+.cat h3{font-size:26px}.cat small{color:var(--mute);letter-spacing:.12em;text-transform:uppercase;font-size:10px}
+.album{position:absolute;left:30%;right:0;top:0;bottom:0;z-index:8;background:var(--bg);overflow-y:auto;padding:28px 40px 60px;opacity:0;pointer-events:none;transform:translateY(24px);transition:opacity .45s,transform .45s;scrollbar-width:none}
+.album.open{opacity:1;pointer-events:auto;transform:none}
+.back{background:none;border:0;color:var(--ink);font:600 11.5px Jost;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;margin-bottom:20px;padding:0}
+.abody{display:grid;grid-template-columns:1.1fr .9fr;gap:34px}
+.big{aspect-ratio:4/5;border-radius:22px;display:grid;place-items:center;overflow:hidden}.big svg{height:70%}.big img{width:100%;height:100%;object-fit:cover}
+.actl{display:flex;align-items:center;gap:10px;margin-top:12px}
+.thumbs{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:12px}
+.thumbs button{aspect-ratio:1;border-radius:12px;border:2px solid transparent;cursor:pointer;display:grid;place-items:center;padding:0;overflow:hidden}.thumbs button.on{border-color:var(--ink)}.thumbs svg{width:55%}.thumbs img{width:100%;height:100%;object-fit:cover}
+#adl{margin:18px 0 24px;display:grid;grid-template-columns:auto 1fr;gap:10px 20px;font-size:15px}#adl dt{color:var(--mute);letter-spacing:.1em;text-transform:uppercase;font-size:11px;padding-top:4px}#adl dd{margin:0}
+#ad{color:var(--mute);max-width:420px}
+@media(max-width:860px){.tag,.nav{display:none}.sc{padding:0 38px 120px 20px}.zz{margin:10px -38px 0 -20px}
+#line{left:auto;right:13px}#sci{left:auto;right:-3px}
+.cats{grid-template-columns:1fr 1fr}.album{left:0;top:62px;padding:20px 20px 80px}.abody{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<svg style="position:absolute" width="0" height="0"><symbol id="dr" viewBox="0 0 300 330"><path d="M105 22Q150 58 195 22L236 58 220 102 200 94 238 316H62L100 94 80 102 64 58Z"/></symbol></svg>
+<div id="cd"></div><div id="cr"></div>
+<div class="frame">
+<aside class="left"><div><a class="logo" href="#top">Thash Attire</a><p class="tag">made for one person only</p><a class="br" href="#contact">{ Start your dress }</a></div>
+<nav class="nav" id="nav"><a href="#how"><i></i>How it works</a><a href="#work"><i></i>Collections</a><a href="#why"><i></i>Why made-to-measure</a><a href="#pricing"><i></i>Pricing</a><a href="#reviews"><i></i>Reviews</a><a href="#faq"><i></i>FAQ</a></nav></aside>
+<div id="line"></div>
+<svg id="sci" viewBox="-18 -30 36 80"><g id="cb1" transform="translate(0 20)"><g id="a1"><path d="M0 0L-3-48" stroke="#231a1d" stroke-width="3.5" stroke-linecap="round"/><circle cx="-8" cy="8" r="7" fill="var(--bg)" stroke="#231a1d" stroke-width="3"/></g><g id="a2"><path d="M0 0L3-48" stroke="#231a1d" stroke-width="3.5" stroke-linecap="round"/><circle cx="8" cy="8" r="7" fill="var(--bg)" stroke="#231a1d" stroke-width="3"/></g></g></svg>
+
+<main class="sc" id="sc">
+<section class="sec hero" id="top"><span class="lab">made for one person only ↘</span>
+<h1>Your dress,<br>cut &amp; stitched<br>for <em>you.</em></h1>
+<div class="hg"><div><p>No bulk. No stock sizes. Every Thash dress is made after your measurements, one at a time.</p><a class="btn r" href="#contact">{ Start your dress }</a><a class="btn" href="#work">See the collection</a>
+<p style="margin-top:16px;font-family:'Cormorant Garamond';font-style:italic;font-size:18px;color:var(--ink)">Made with love. Delivered to your doorstep.</p></div>
+<div class="panel" id="panel"><svg viewBox="0 0 300 330" id="art"><use href="#dr" id="fill" fill="#d9707a"/><path d="M105 22Q150 58 195 22" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="5 4"/><path d="M118 36Q150 58 182 36M70 300H230" fill="none" stroke="#f1d9a0" stroke-width="3" stroke-dasharray="3 5"/><g transform="rotate(10 243 165)"><rect x="212" y="150" width="62" height="30" rx="4" fill="#fffcf7" stroke="#231a1d" stroke-width="1.5"/><text x="243" y="170" font-size="11" font-weight="700" text-anchor="middle" fill="#231a1d">₹[PRICE]</text></g></svg>
+<div class="sc2">made for you, with love</div><div class="pills"><span>1. Measure</span><span>2. Cut</span><span>3. Stitch</span><span>4. Deliver</span></div>
+<div class="swt">Fabric <i style="background:#d9707a;outline:2px solid #231a1d" data-c="#d9707a"></i><i style="background:#1f5c46" data-c="#1f5c46"></i><i style="background:#e8b84a" data-c="#e8b84a"></i><i style="background:#3b3fa8" data-c="#3b3fa8"></i></div></div></div>
+<div class="zz"><div class="bar"></div><svg preserveAspectRatio="none" viewBox="0 0 1200 24"><defs><pattern id="z" width="40" height="24" patternUnits="userSpaceOnUse"><path d="M0 0L20 24L40 0Z" fill="#231a1d"/></pattern></defs><rect width="1200" height="24" fill="url(#z)"/></svg></div></section>
+
+<section class="sec" id="how"><span class="lab">how it works</span><h2 class="rv">From your measurements<br>to your doorstep.</h2><div class="g4">
+<div class="c4 rv"><b>1</b><h3>Share your measurements</h3><p>Send them on WhatsApp or use our form. We’ll guide you step by step.</p></div><div class="c4 rv"><b>2</b><h3>We cut your fabric</h3><p>Your pieces are cut to your numbers, in the fabric and colour you choose.</p></div><div class="c4 rv"><b>3</b><h3>We stitch it</h3><p>Every seam is stitched with care, and checked against your measurements.</p></div><div class="c4 rv"><b>4</b><h3>It reaches you</h3><p>Delivered to your door. [Add your fitting and alteration policy.]</p></div></div></section>
+
+<section class="sec" id="work"><span class="lab">our collections</span><h2 class="rv">Every style,<br>made for you.</h2><div class="cats" id="cats"></div></section>
+
+<section class="sec" id="why"><span class="lab">why made-to-measure</span><h2 class="rv">Problems ready-made<br>can’t solve.</h2><div class="g3">
+<div class="c3 rv" style="background:#f5d5d3"><h3>“It never fits right.”</h3><p>Tight at the hip, loose at the waist. Ours is cut to your numbers, so it sits where it should.</p></div><div class="c3 rv" style="background:#f4e3b8"><h3>“Everyone has the same one.”</h3><p>Because we don’t make in bulk, your dress is made for you alone: your fabric, your colour, your details.</p></div><div class="c3 rv" style="background:#d9e8e0"><h3>“My size is always sold out.”</h3><p>There is no stock to sell out. Every dress starts when you order, in your size.</p></div></div></section>
+
+<section class="sec" id="pricing"><div class="price rv"><span class="lab">simple pricing</span><h2>From<br>₹[PRICE]</h2><small style="color:var(--mute)">per dress, made to order</small><ul><li>Stitched to your measurements</li><li>Choose your fabric and colour</li><li>One-to-one help with measuring</li><li>[Alteration terms — your policy]</li></ul><a class="btn r" href="#contact">{ Start your dress }</a></div></section>
+
+<section class="sec rev" id="reviews"><span class="lab">reviews</span><h2 id="rt"></h2><b id="rn"></b><div style="margin-top:16px"><small id="rc" style="margin-right:8px"></small><button class="ar" id="rp">←</button><button class="ar" id="rx">→</button></div></section>
+
+<section class="sec" id="faq"><span class="lab">questions</span><h2>Good to know.</h2>
+<details open><summary>How does made-to-measure work?</summary><p>Sample answer: you pick a design, send your measurements (we help you measure), and we cut and stitch the dress for you.</p></details><details><summary>How long does it take?</summary><p>[Add your timeline.]</p></details><details><summary>Can I change the design or fabric?</summary><p>[Add your policy.]</p></details><details><summary>Do you deliver across India?</summary><p>[Add your delivery details.]</p></details></section>
+
+<section class="sec" id="contact"><div class="contact"><span class="lab">get in touch</span><h2>Ready to be measured?</h2><a class="btn" style="background:#1fa971;color:#fff" id="wa" target="_blank" rel="noopener">{ WhatsApp }</a><a class="btn" style="background:#fbf4ec;color:#231a1d" href="https://instagram.com/thashattire" target="_blank" rel="noopener">{ Instagram }</a><a class="btn r" href="mailto:hello@thashattire.com">{ Email }</a></div>
+<div class="ft"><span class="logo" style="font-size:30px">Thash Attire</span><span class="sc2" style="color:var(--ink)">Made with love, mom’s care</span><span>© 2026 Thash Attire</span></div></section>
+</main>
+
+<div class="album" id="al"><button class="back" id="ab">← All collections</button><div class="abody"><div><div class="big" id="big"></div><div class="actl"><button class="ar" id="ap">←</button><button class="ar" id="anx">→</button><small id="an"></small></div><div class="thumbs" id="th"></div></div>
+<div><span class="lab">collection</span><h2 id="at"></h2><p id="ad"></p><dl id="adl"></dl><a class="btn r" id="ao" target="_blank" rel="noopener">{ Order this style }</a></div></div></div>
+<div id="tri"><a id="triwa" target="_blank" rel="noopener" aria-label="Order on WhatsApp"><svg viewBox="0 0 200 200"><polygon points="8,200 200,200 200,8" fill="#d9707a" stroke="#d9707a" stroke-width="16" stroke-linejoin="round"/><path d="M52 200L200 52" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-dasharray="0.1 8" fill="none"/><text transform="translate(142 142) rotate(-45)" text-anchor="middle" font-size="13">Order on</text><text transform="translate(149 149) rotate(-45)" text-anchor="middle" font-size="13">WhatsApp ✦</text></svg></a><button id="triok" aria-label="Close">×</button></div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id),WA="910000000000"; // replace with your WhatsApp number
+const wl=`https://wa.me/${WA}?text=${encodeURIComponent("Hi Thash Attire, I’d like to start a dress.")}`;
+$("wa").href=wl;$("triwa").setAttribute("href",wl);$("triok").onclick=()=>{$("tri").style.transform="translate(120%,120%)";$("tri").style.opacity=0;$("tri").style.pointerEvents="none"};
+const sc=$("sc"),fr=document.querySelector(".frame"),line=$("line"),sci=$("sci"),a1=$("a1"),a2=$("a2"),links=[...document.querySelectorAll("#nav a")],secs=links.map(a=>$(a.getAttribute("href").slice(1)));
+const io=new IntersectionObserver(e=>e.forEach(x=>{if(x.isIntersecting){x.target.classList.add("in");io.unobserve(x.target)}}),{root:sc,threshold:.12});document.querySelectorAll(".rv").forEach(e=>io.observe(e));
+// scissors travel down the dotted line as you scroll; the line is cut away above them
+let lastT=0,open=0;
+function upd(){const max=Math.max(1,sc.scrollHeight-sc.clientHeight),p=sc.scrollTop/max,H=fr.clientHeight,off=innerWidth<=860?66:0,y=off+20+p*(H-170-off);
+sci.style.top=y+"px";line.style.top=(y+62)+"px";
+const v=Math.abs(sc.scrollTop-lastT);lastT=sc.scrollTop;open=Math.min(26,open*.9+v*1.2);const o=4+open+Math.abs(Math.sin(sc.scrollTop/14))*4;
+a1.setAttribute("transform",`rotate(${-o})`);a2.setAttribute("transform",`rotate(${o})`);
+let k=0;secs.forEach((s,i)=>{if(s.offsetTop-220<=sc.scrollTop)k=i});links.forEach((l,i)=>l.classList.toggle("on",i===k&&sc.scrollTop>200))}
+sc.addEventListener("scroll",upd,{passive:true});addEventListener("resize",upd);(function l(){upd();requestAnimationFrame(l)})();
+// cursor: black dot + outline ring; ring grows over clickable things; dress card tilts toward cursor
+const cd=$("cd"),cr=$("cr");let mx=0,my=0,rx=0,ry=0;
+addEventListener("pointermove",e=>{mx=e.clientX;my=e.clientY;cd.style.opacity=cr.style.opacity=1;cd.style.transform=`translate(${mx}px,${my}px)`;
+const r=$("panel").getBoundingClientRect();if(mx>r.left&&mx<r.right&&my>r.top&&my<r.bottom){$("art").style.transform=`rotateY(${((mx-r.left)/r.width-.5)*14}deg) rotateX(${-((my-r.top)/r.height-.5)*14}deg)`}else $("art").style.transform=""});
+document.addEventListener("pointerover",e=>cr.classList.toggle("h",!!e.target.closest("a,button,summary,.cat,.swt i")));
+document.documentElement.addEventListener("pointerleave",()=>{cd.style.opacity=cr.style.opacity=0});
+(function l(){rx+=(mx-rx)*.18;ry+=(my-ry)*.18;cr.style.transform=`translate(${rx}px,${ry}px)`;requestAnimationFrame(l)})();
+document.querySelectorAll(".swt i").forEach(i=>i.onclick=()=>{$("fill").setAttribute("fill",i.dataset.c);document.querySelectorAll(".swt i").forEach(x=>x.style.outline="");i.style.outline="2px solid #231a1d"});
+
+// ---- Collections album: edit names, details and image URLs here ----
+const PAL=[["#d9707a","#f5d5d3"],["#1f5c46","#f1d9a0"],["#e8b84a","#d9e8e0"],["#3b3fa8","#f5d5d3"],["#e9a3a8","#f1d9a0"],["#2f7a5b","#f4e3b8"]];
+const CATS=[
+{t:"Casual Wear",d:"Easy everyday dresses, cut for comfort and made to move with you.",n:"Everyday Kurta Dress|Shirt Dress|Tiered Midi|Wrap Dress|A-line Dress|Maxi Dress",f:"Cotton, linen, soft crepe"},
+{t:"Co-ord Sets",d:"Matching tops and bottoms, stitched as a pair to your measurements.",n:"Linen Co-ord|Printed Co-ord|Kurti Pant Set|Skirt Set|Crop Set|Palazzo Set",f:"Linen, cotton, rayon"},
+{t:"Festive Wear",d:"Rich fabrics and detail for celebrations, made for one person.",n:"Mehendi Anarkali|Silk Lehenga|Sharara Set|Embroidered Kurta|Festive Gown|Saree Blouse",f:"Silk, georgette, brocade"},
+{t:"Party Gowns",d:"Statement gowns fitted closely to you and finished by hand.",n:"Evening Gown|Cocktail Dress|Fit & Flare|Off-shoulder Gown|Satin Slip|Tulle Gown",f:"Satin, crepe, tulle"},
+{t:"Kurti Sets",d:"Classic kurti sets for work, family and every day in between.",n:"Straight Kurti Set|A-line Kurti Set|Cotton Set|Printed Set|Anarkali Set|Angrakha Set",f:"Cotton, rayon, chanderi"},
+{t:"Kids Wear",d:"Soft, comfortable outfits for little ones, made to grow with them.",n:"Frock|Party Frock|Ethnic Set|Lehenga Choli|Casual Dress|Twinning Set",f:"Soft cotton, muslin, silk"}];
+// to use photos, add URLs in the same order as the names, e.g. CATS[0].img=["https://.../1.jpg", ...]
+const D=[["Fit","Made to your measurements"],["Ready in","[Add timeline]"],["Starting at","₹[PRICE]"]];
+let ci=0,ii=0;const al=$("al");
+const vis=(i,c,big)=>{const im=(CATS[ci].img||[])[i];return im?`<img src="${im}" alt="${CATS[ci].n.split("|")[i]}">`:`<svg viewBox="0 0 300 330"><use href="#dr" fill="${PAL[(i+ci)%6][0]}"/></svg>`};
+$("cats").innerHTML=CATS.map((c,i)=>`<button class="cat" data-i="${i}"><div class="tile" style="background:${PAL[i][1]}"><svg viewBox="0 0 300 330"><use href="#dr" fill="${PAL[i][0]}"/></svg></div><h3>${c.t}</h3><small>6 designs</small></button>`).join("");
+function show(){const c=CATS[ci],ns=c.n.split("|");$("at").textContent=c.t;$("ad").textContent=c.d;
+$("adl").innerHTML=[["Fabrics",c.f],...D].map(r=>`<dt>${r[0]}</dt><dd>${r[1]}</dd>`).join("");
+$("big").style.background=PAL[(ii+ci)%6][1];$("big").innerHTML=vis(ii);$("an").textContent=`${ns[ii]} · ${ii+1} of 6`;
+$("th").innerHTML=ns.map((n,i)=>`<button class="${i==ii?"on":""}" style="background:${PAL[(i+ci)%6][1]}" data-k="${i}" aria-label="${n}">${vis(i)}</button>`).join("");
+$("ao").href=`https://wa.me/${WA}?text=${encodeURIComponent("Hi Thash Attire, I’d like to order a "+ns[ii]+" from "+c.t+".")}`}
+document.addEventListener("click",e=>{const k=e.target.closest(".cat");if(k){ci=+k.dataset.i;ii=0;show();al.scrollTop=0;al.classList.add("open");return}
+const t=e.target.closest("#th button");if(t){ii=+t.dataset.k;show()}});
+$("ab").onclick=()=>al.classList.remove("open");addEventListener("keydown",e=>{if(e.key==="Escape")al.classList.remove("open")});
+$("ap").onclick=()=>{ii=(ii+5)%6;show()};$("anx").onclick=()=>{ii=(ii+1)%6;show()};
+const R=[["“[Customer review goes here — what they loved about the fit]”","[Name], [City]"],["“[Second review goes here]”","[Name], [City]"]];let ri=0;
+function sr(){$("rt").textContent=R[ri][0];$("rn").textContent=R[ri][1];$("rc").textContent=`${ri+1} of 2`}
+$("rp").onclick=$("rx").onclick=()=>{ri=(ri+1)%2;sr()};sr();
+</script>
+</body>
+</html>

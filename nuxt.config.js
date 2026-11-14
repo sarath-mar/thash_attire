@@ -23,15 +23,15 @@ export default defineNuxtConfig({
           thashLight: {
             dark: false,
             colors: {
-              primary: '#1A1A1A',
-              secondary: '#8B7355',
-              accent: '#C9A96E',
+            primary: '#231A1D',
+            secondary: '#6F6063',
+            accent: '#D9707A',
               error: '#C0392B',
               warning: '#D4A574',
               info: '#6B7280',
               success: '#2D6A4F',
-              background: '#FAFAF8',
-              surface: '#FFFFFF',
+              background: '#FBF4EC',
+              surface: '#FFFCF7',
             },
           },
           thashDark: {
@@ -70,7 +70,7 @@ export default defineNuxtConfig({
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
         {
           name: 'description',
-          content: 'Thash Attire — Premium women\'s clothing boutique. Discover elegant fashion crafted with care.',
+          content: 'Your dress, cut & stitched for you. Every Thash dress is made after your measurements, one at a time.',
         },
       ],
       link: [
@@ -78,7 +78,7 @@ export default defineNuxtConfig({
         { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
         {
           rel: 'stylesheet',
-          href: 'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Montserrat:wght@300;400;500;600;700&display=swap',
+          href: 'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Dancing+Script:wght@500&family=Jost:wght@400;500;600;700&display=swap',
         },
       ],
     },

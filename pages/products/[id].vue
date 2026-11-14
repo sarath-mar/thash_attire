@@ -58,7 +58,7 @@
                 :class="{ 'ta-product-detail__thumb--active': showingVideo }"
                 @click="selectVideo"
               >
-                <v-icon icon="mdi-play-circle" size="28" color="#C5A059" />
+                <v-icon icon="mdi-play-circle" size="28" color="#d9707a" />
                 <span class="text-micro font-weight-bold d-block mt-1 text-gold">VIDEO DEMO</span>
               </button>
             </div>
@@ -147,21 +147,21 @@
             <!-- Guarantees & Highlights -->
             <div class="ta-product-detail__guarantees mt-8">
               <div class="ta-guarantee-item">
-                <v-icon icon="mdi-truck-fast-outline" color="#C5A059" size="20" class="me-3" />
+                <v-icon icon="mdi-truck-fast-outline" color="#d9707a" size="20" class="me-3" />
                 <div>
                   <span class="font-weight-semibold text-body-2 d-block">Free Express Shipping</span>
                   <span class="text-caption text-muted">Delivered safely across India & Worldwide</span>
                 </div>
               </div>
               <div class="ta-guarantee-item">
-                <v-icon icon="mdi-check-decagram-outline" color="#C5A059" size="20" class="me-3" />
+                <v-icon icon="mdi-check-decagram-outline" color="#d9707a" size="20" class="me-3" />
                 <div>
                   <span class="font-weight-semibold text-body-2 d-block">100% Authentic Handloom</span>
                   <span class="text-caption text-muted">Handcrafted by certified master artisans</span>
                 </div>
               </div>
               <div class="ta-guarantee-item">
-                <v-icon icon="mdi-hanger" color="#C5A059" size="20" class="me-3" />
+                <v-icon icon="mdi-hanger" color="#d9707a" size="20" class="me-3" />
                 <div>
                   <span class="font-weight-semibold text-body-2 d-block">Bespoke Custom Stitching</span>
                   <span class="text-caption text-muted">Custom blouse & hem alterations available</span>
@@ -296,7 +296,7 @@ const getColorHex = (name) => {
     'Wine Red': '#722f37',
     'Midnight Black': '#121212',
   }
-  return map[name] || '#c5a059'
+  return map[name] || '#d9707a'
 }
 
 const whatsappOrderLink = computed(() => {

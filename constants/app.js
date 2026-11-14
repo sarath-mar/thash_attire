@@ -7,7 +7,7 @@ export const PaginationDefaults = Object.freeze({
 
 export const AppConfig = Object.freeze({
   APP_NAME: 'Thash Attire',
-  APP_TAGLINE: 'Premium Women\'s Fashion',
+  APP_TAGLINE: 'Made for one person only',
   CURRENCY: 'INR',
   CURRENCY_SYMBOL: '₹',
   LOCALE: 'en-IN',

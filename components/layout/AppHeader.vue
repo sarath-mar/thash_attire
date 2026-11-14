@@ -1,11 +1,10 @@
 <template>
-  <header class="ta-header-wrapper.0">
+  <header class="ta-header-wrapper">
     <!-- Top Luxury Announcement Bar -->
     <div class="ta-announcement">
       <div class="container ta-announcement__content">
-        <span class="ta-announcement__text">
-          <v-icon icon="mdi-sparkles" size="14" class="me-1" color="#C5A059" />
-          Free Express Shipping on Orders Above ₹4,999 | Artisanal Couture
+          <span class="ta-announcement__text">
+          Made for one person only · Cut after your measurements
         </span>
         <a :href="whatsappLink" target="_blank" class="ta-announcement__link">
           <v-icon icon="mdi-whatsapp" size="14" class="me-1" />
@@ -19,8 +18,8 @@
       <div class="ta-header__container container">
         <!-- Logo Branding -->
         <NuxtLink to="/" class="ta-header__logo">
-          <span class="ta-header__logo-brand">THASH ATTIRE</span>
-          <span class="ta-header__logo-sub">HAUTE COUTURE</span>
+          <span class="ta-header__logo-brand">Thash Attire</span>
+          <span class="ta-header__logo-sub">made for one person only</span>
         </NuxtLink>
 
         <!-- Navigation Links -->
@@ -50,7 +49,7 @@
             aria-label="Direct WhatsApp Order"
           >
             <v-icon icon="mdi-whatsapp" size="18" class="me-1" />
-            <span class="d-none d-sm-inline text-caption font-weight-medium">Order via WhatsApp</span>
+            <span class="d-none d-sm-inline">Start your dress</span>
           </a>
 
           <button
@@ -104,7 +103,7 @@ onMounted(() => {
   font-size: 0.72rem;
   letter-spacing: $letter-spacing-wider;
   padding-block: 6px;
-  border-bottom: 1px solid rgba(197, 160, 89, 0.2);
+  border-bottom: 1px solid rgba(240, 185, 189, 0.45);
 
   &__content {
     @include flex-between;
@@ -163,20 +162,21 @@ onMounted(() => {
   }
 
   &__logo-brand {
-    font-family: var(--font-heading);
-    font-size: 1.45rem;
-    font-weight: 600;
-    letter-spacing: 0.18em;
-    color: var(--color-primary);
-    line-height: 1.1;
+    font-family: var(--font-script);
+    font-size: 2rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    color: var(--color-accent);
+    line-height: 1;
+    text-transform: none;
   }
 
   &__logo-sub {
     font-family: var(--font-body);
-    font-size: 0.58rem;
+    font-size: 0.62rem;
     font-weight: $font-weight-semibold;
-    letter-spacing: 0.35em;
-    color: var(--color-accent);
+    letter-spacing: 0.16em;
+    color: var(--color-text-secondary);
     text-transform: uppercase;
   }
 

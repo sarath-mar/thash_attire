@@ -58,7 +58,7 @@
           <div class="ta-about-page__values">
             <div v-for="val in values" :key="val.title" class="ta-value-card">
               <div class="ta-value-card__icon-wrap">
-                <v-icon :icon="val.icon" size="28" color="#C5A059" />
+                <v-icon :icon="val.icon" size="28" color="#d9707a" />
               </div>
               <h3 class="ta-value-card__title">{{ val.title }}</h3>
               <p class="ta-value-card__text">{{ val.description }}</p>

@@ -49,7 +49,7 @@
               rel="noopener noreferrer"
               class="ta-contact-page__method"
             >
-              <v-icon icon="mdi-instagram" size="32" color="#C5A059" />
+              <v-icon icon="mdi-instagram" size="32" color="#d9707a" />
               <div>
                 <strong>Instagram Direct</strong>
                 <span>Follow @thashattire for daily arrivals & DM styling</span>
@@ -57,7 +57,7 @@
             </a>
 
             <div class="ta-contact-page__method">
-              <v-icon icon="mdi-store-outline" size="32" color="#C5A059" />
+              <v-icon icon="mdi-store-outline" size="32" color="#d9707a" />
               <div>
                 <strong>Flagship Boutique Atelier</strong>
                 <span>102 Couture Haven, Luxury Lane, Jubilee Hills, Hyderabad</span>
@@ -65,7 +65,7 @@
             </div>
 
             <div class="ta-contact-page__method">
-              <v-icon icon="mdi-clock-outline" size="32" color="#C5A059" />
+              <v-icon icon="mdi-clock-outline" size="32" color="#d9707a" />
               <div>
                 <strong>Boutique Hours</strong>
                 <span>Mon – Sat: 10:00 AM – 8:00 PM (IST)</span>
