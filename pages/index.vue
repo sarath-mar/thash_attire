@@ -481,7 +481,11 @@ const applyMotion = () => {
   const pages = board.querySelectorAll('.ed-sec')
   const stageH = root.clientHeight
   pages.forEach((section, index) => {
-    if (index === 0 || index === pages.length - 1) return
+    if (index === 0) return
+    if (index === pages.length - 1) {
+      section.style.minHeight = `${stageH}px`
+      return
+    }
     section.style.minHeight = ''
   })
 
@@ -502,7 +506,9 @@ const applyMotion = () => {
     cut = Math.max(0, cut - velocity / 36)
     velocity = 0
   }
-  if (cut >= 1 && limit > 0 && pos <= -limit + 1 && velocity < 0 && zipPhase < 1) {
+  const tail = pages[pages.length - 1]
+  const tailTop = tail ? tail.offsetTop + pos : 0
+  if (cut >= 1 && limit > 0 && pos <= -limit + 1 && tailTop <= 24 && velocity < 0 && zipPhase < 1) {
     zipPhase = Math.min(1, zipPhase - velocity / 36)
     velocity = 0
   }
@@ -606,7 +612,7 @@ const applyMotion = () => {
     const closing = !zipping && apart > 0.02 && window.innerWidth > 860
     last.classList.toggle('is-sheet', closing)
     if (closing) {
-      const swing = Math.min(1, apart * 1.35)
+      const swing = apart
       const shift = swing * root.clientWidth * 0.42
       const tilt = swing * -18
       last.style.position = 'relative'
@@ -670,9 +676,13 @@ const onPointerMove = (event) => {
 const useToolScroll = (delta) => {
   const root = scroller.value
   const board = track.value
-  const limit = Math.max(0, (board?.scrollHeight || 0) - (root?.clientHeight || 0))
+  const stageH = root?.clientHeight || 0
+  const limit = Math.max(0, (board?.scrollHeight || 0) - stageH)
+  const last = board?.querySelector('.ed-sec:last-child')
+  const lastTop = last ? last.offsetTop + pos : 0
+  const settled = !last || lastTop <= 24
   const atTop = pos >= -8
-  const atEnd = cut >= 1 && limit > 0 && pos <= -limit + 8
+  const atEnd = cut >= 1 && limit > 0 && pos <= -limit + 8 && settled
 
   if (delta > 0 && atTop && cut < 1) {
     const need = (1 - cut) * TOOL_RANGE
