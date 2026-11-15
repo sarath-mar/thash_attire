@@ -51,14 +51,16 @@
         <section id="top" class="ed-sec ed-hero">
           <div class="ed-hero-grid">
             <div class="ed-hero-copy">
-              <span class="ed-lab">made for one person only ↘</span>
-              <h1>Your dress,<br>cut &amp; stitched<br>for <em>you.</em></h1>
-              <p>No bulk. No stock sizes. Every Thash dress is made after your measurements, one at a time.</p>
-              <a class="ed-btn ed-btn--rose" href="#contact" @click.prevent="scrollTo('contact')">{ Start your dress }</a>
-              <a class="ed-btn" href="#work" @click.prevent="scrollTo('work')">See the collection</a>
-              <p class="ed-love">Made with love. Delivered to your doorstep.</p>
+              <span class="ed-lab ed-rv">made for one person only ↘</span>
+              <h1 class="ed-rv">Your dress,<br>cut &amp; stitched<br>for <em>you.</em></h1>
+              <p class="ed-rv">No bulk. No stock sizes. Every Thash dress is made after your measurements, one at a time.</p>
+              <div class="ed-rv">
+                <a class="ed-btn ed-btn--rose" href="#contact" @click.prevent="scrollTo('contact')">{ Start your dress }</a>
+                <a class="ed-btn" href="#work" @click.prevent="scrollTo('work')">See the collection</a>
+              </div>
+              <p class="ed-love ed-rv">Made with love. Delivered to your doorstep.</p>
             </div>
-            <div class="ed-panel">
+            <div class="ed-panel ed-rv">
               <div class="ed-photo-wrap">
                 <img class="ed-photo" :src="heroPhoto" alt="Thash Attire dress, cut to measure">
                 <span class="ed-photo-tag">{{ dressTag }}</span>
@@ -75,7 +77,7 @@
         </section>
 
         <section id="how" class="ed-sec">
-          <span class="ed-lab">how it works</span>
+          <span class="ed-lab ed-rv">how it works</span>
           <h2 class="ed-rv">From your measurements<br>to your doorstep.</h2>
           <div class="ed-steps">
             <article v-for="step in steps" :key="step.n" class="ed-step ed-rv">
@@ -87,14 +89,14 @@
         </section>
 
         <section id="work" class="ed-sec">
-          <span class="ed-lab">our collections</span>
+          <span class="ed-lab ed-rv">our collections</span>
           <h2 class="ed-rv">Every style,<br>made for you.</h2>
           <div class="ed-cats">
             <button
               v-for="(collection, index) in collections"
               :key="collection.title"
               type="button"
-              class="ed-cat"
+              class="ed-cat ed-rv"
               @click="openAlbum(index)"
             >
               <div class="ed-cat__tile" :style="{ background: collection.palette[1] }">
@@ -107,7 +109,7 @@
         </section>
 
         <section id="why" class="ed-sec">
-          <span class="ed-lab">why made-to-measure</span>
+          <span class="ed-lab ed-rv">why made-to-measure</span>
           <h2 class="ed-rv">Problems ready-made<br>can’t solve.</h2>
           <div class="ed-why">
             <article
@@ -138,10 +140,10 @@
         </section>
 
         <section id="reviews" class="ed-sec">
-          <span class="ed-lab">reviews</span>
-          <h2>{{ reviews[reviewIndex].quote }}</h2>
-          <b>{{ reviews[reviewIndex].name }}</b>
-          <div class="ed-review-nav">
+          <span class="ed-lab ed-rv">reviews</span>
+          <h2 class="ed-rv">{{ reviews[reviewIndex].quote }}</h2>
+          <b class="ed-rv">{{ reviews[reviewIndex].name }}</b>
+          <div class="ed-review-nav ed-rv">
             <small>{{ reviewIndex + 1 }} of {{ reviews.length }}</small>
             <button type="button" class="ed-arrow" aria-label="Previous review" @click="stepReview(-1)">←</button>
             <button type="button" class="ed-arrow" aria-label="Next review" @click="stepReview(1)">→</button>
@@ -149,23 +151,23 @@
         </section>
 
         <section id="faq" class="ed-sec">
-          <span class="ed-lab">questions</span>
-          <h2>Good to know.</h2>
-          <details v-for="(item, index) in faqs" :key="item.q" :open="index === 0">
+          <span class="ed-lab ed-rv">questions</span>
+          <h2 class="ed-rv">Good to know.</h2>
+          <details v-for="(item, index) in faqs" :key="item.q" class="ed-rv" :open="index === 0">
             <summary>{{ item.q }}</summary>
             <p>{{ item.a }}</p>
           </details>
         </section>
 
         <section id="contact" class="ed-sec">
-          <div class="ed-contact">
+          <div class="ed-contact ed-rv">
             <span class="ed-lab">get in touch</span>
             <h2>Ready to be measured?</h2>
             <a class="ed-btn ed-btn--wa" :href="whatsappLink" target="_blank" rel="noopener">{ WhatsApp }</a>
             <a class="ed-btn ed-btn--ivory" :href="instagramUrl" target="_blank" rel="noopener">{ Instagram }</a>
             <a class="ed-btn ed-btn--rose" href="mailto:hello@thashattire.com">{ Email }</a>
           </div>
-          <footer class="ed-foot">
+          <footer class="ed-foot ed-rv">
             <span class="ed-logo">Thash Attire</span>
             <span class="ed-script ed-script--ink">Made with love, mom’s care</span>
             <span class="ed-foot__links">
@@ -465,6 +467,7 @@ let goal = null
 let cut = 0
 let zipPhase = 0
 let touchY = 0
+const touchSamples = []
 const trailPoints = []
 const TRAIL_LIFE = 200
 const SCROLL_SPEED = 0.16
@@ -518,12 +521,13 @@ const applyMotion = () => {
     velocity = 0
   }
 
-  const cap = goal != null ? 72 : MAX_VELOCITY
+  const coasting = window.innerWidth <= 860 && goal == null
+  const cap = goal != null ? 72 : (coasting ? 110 : MAX_VELOCITY)
   velocity = Math.max(-cap, Math.min(cap, velocity))
 
   if (!reduceMotion) {
     pos += velocity
-    velocity *= SCROLL_FRICTION
+    velocity *= coasting ? 0.94 : SCROLL_FRICTION
     if (Math.abs(velocity) < 0.08) velocity = 0
   }
 
@@ -727,6 +731,13 @@ const useToolScroll = (delta) => {
   return false
 }
 
+const wheelPixels = (event) => {
+  const raw = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX
+  if (event.deltaMode === 1) return raw * 42
+  if (event.deltaMode === 2) return raw * (scroller.value?.clientHeight || 700)
+  return raw
+}
+
 const movePage = (delta) => {
   const root = scroller.value
   const board = track.value
@@ -739,10 +750,10 @@ const movePage = (delta) => {
 const onWheel = (event) => {
   if (albumOpen.value || event.target.closest('.ed-album')) return
   event.preventDefault()
-  const delta = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX
+  const delta = wheelPixels(event)
   goal = null
   if (window.innerWidth <= 860) {
-    movePage(delta)
+    movePage(delta * 2.4)
     return
   }
   if (useToolScroll(delta)) return
@@ -755,7 +766,10 @@ const onWheel = (event) => {
 
 const onTouchStart = (event) => {
   touchY = event.touches[0]?.clientY || 0
+  touchSamples.length = 0
+  touchSamples.push({ y: touchY, t: performance.now() })
   velocity = 0
+  goal = null
 }
 
 const onTouchMove = (event) => {
@@ -766,10 +780,27 @@ const onTouchMove = (event) => {
   if (!delta) return
   event.preventDefault()
   goal = null
+  const now = performance.now()
+  touchSamples.push({ y: nextY, t: now })
+  while (touchSamples.length && now - touchSamples[0].t > 90) touchSamples.shift()
   if (window.innerWidth > 860 && cut < 1 && delta > 0) {
     cut = Math.min(1, cut + Math.abs(delta) / 280)
   }
-  movePage(delta)
+  const gain = window.innerWidth <= 860 ? 2.4 : 1
+  movePage(delta * gain)
+}
+
+const onTouchEnd = () => {
+  if (touchSamples.length < 2) return
+  const first = touchSamples[0]
+  const last = touchSamples[touchSamples.length - 1]
+  const dt = Math.max(16, last.t - first.t)
+  const gain = window.innerWidth <= 860 ? 2.4 : 1
+  const pxPerMs = ((first.y - last.y) * gain) / dt
+  const cap = window.innerWidth <= 860 ? 110 : 42
+  velocity = Math.max(-cap, Math.min(cap, -pxPerMs * 16.7))
+  if (Math.abs(velocity) < 0.8) velocity = 0
+  touchSamples.length = 0
 }
 
 const onKeydown = (event) => {
@@ -784,6 +815,8 @@ onMounted(async () => {
   frame?.addEventListener('wheel', onWheel, { passive: false })
   frame?.addEventListener('touchstart', onTouchStart, { passive: true })
   frame?.addEventListener('touchmove', onTouchMove, { passive: false })
+  frame?.addEventListener('touchend', onTouchEnd)
+  frame?.addEventListener('touchcancel', onTouchEnd)
   window.addEventListener('resize', applyMotion)
   window.addEventListener('keydown', onKeydown)
   window.addEventListener('pointermove', onPointerMove)
@@ -800,8 +833,13 @@ onMounted(async () => {
         entry.target.classList.add('is-in')
         observer.unobserve(entry.target)
       })
-    }, { root, threshold: 0.12 })
-    revealItems.forEach((item) => observer.observe(item))
+    }, { root, threshold: 0.01, rootMargin: '80px 0px' })
+    root.querySelectorAll('.ed-sec').forEach((section) => {
+      section.querySelectorAll('.ed-rv').forEach((item, index) => {
+        item.style.transitionDelay = `${Math.min(index, 7) * 80}ms`
+        observer.observe(item)
+      })
+    })
     onUnmounted(() => observer.disconnect())
   }
 
@@ -823,6 +861,8 @@ onUnmounted(() => {
   frameRef.value?.removeEventListener('wheel', onWheel)
   frameRef.value?.removeEventListener('touchstart', onTouchStart)
   frameRef.value?.removeEventListener('touchmove', onTouchMove)
+  frameRef.value?.removeEventListener('touchend', onTouchEnd)
+  frameRef.value?.removeEventListener('touchcancel', onTouchEnd)
   window.removeEventListener('resize', applyMotion)
   window.removeEventListener('keydown', onKeydown)
   window.removeEventListener('pointermove', onPointerMove)
@@ -1541,8 +1581,8 @@ h2 {
 
 .ed-rv {
   opacity: 0;
-  transform: translateY(28px);
-  transition: opacity 0.8s, transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transform: translateY(22px);
+  transition: opacity 0.75s ease, transform 0.75s cubic-bezier(0.2, 0.7, 0.2, 1);
 
   &.is-in {
     opacity: 1;
