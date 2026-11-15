@@ -27,12 +27,16 @@
     <v-row v-else dense class="ta-admin-banners__grid">
       <v-col v-for="banner in banners" :key="banner.id" cols="12" md="6" lg="4">
         <v-card elevation="0" border rounded="lg" class="ta-banner-card">
-          <v-img :src="banner.image_url" height="180" cover class="align-end bg-grey-lighten-2">
+          <v-img v-if="banner.image_url" :src="banner.image_url" height="180" cover class="align-end bg-grey-lighten-2">
             <div class="ta-banner-card__overlay pa-3">
               <h3 class="text-white text-subtitle-1 font-weight-bold mb-1">{{ banner.title }}</h3>
               <p v-if="banner.subtitle" class="text-white text-caption">{{ banner.subtitle }}</p>
             </div>
           </v-img>
+          <div v-else class="pa-4">
+            <h3 class="text-subtitle-1 font-weight-bold mb-1">{{ banner.title }}</h3>
+            <p v-if="banner.subtitle" class="text-caption text-medium-emphasis">{{ banner.subtitle }}</p>
+          </div>
           
           <v-card-text class="pa-3">
             <div class="d-flex align-center justify-space-between mb-2">
@@ -65,23 +69,34 @@
         <v-card-title class="pa-4">{{ form.id ? 'Edit Banner' : 'Add Banner' }}</v-card-title>
         <v-divider />
         <v-card-text class="pa-4">
+          <v-alert v-if="formError" type="error" variant="tonal" density="compact" class="mb-4">{{ formError }}</v-alert>
           <v-form ref="formRef">
-            <AdminImageUpload v-model="form.image" label="Banner Image" :max-images="1" class="mb-4" />
-            <v-text-field v-model="form.title" label="Title" variant="outlined" density="comfortable" class="mb-2" />
-            <v-text-field v-model="form.subtitle" label="Subtitle (optional)" variant="outlined" density="comfortable" class="mb-2" />
-            
+            <AdminImageUpload v-model="form.image" label="Banner image *" :max-images="1" :error="imageError" class="mb-4" />
+            <v-text-field v-model="form.title" label="Title *" variant="outlined" density="comfortable" class="mb-2" :rules="[v => !!(v && String(v).trim()) || 'Enter a title']" />
+            <v-text-field v-model="form.subtitle" label="Subtitle" variant="outlined" density="comfortable" class="mb-2" :rules="[v => !v || String(v).trim().length <= 160 || 'Subtitle must be 160 characters or less']" />
+
             <v-row dense class="mb-2">
-              <v-col cols="6"><v-text-field v-model="form.button_text" label="Button Text" variant="outlined" density="comfortable" /></v-col>
-              <v-col cols="6"><v-text-field v-model="form.button_link" label="Button Link" variant="outlined" density="comfortable" /></v-col>
+              <v-col cols="6">
+                <v-text-field v-model="form.button_text" label="Button text" variant="outlined" density="comfortable" :rules="[v => !String(form.button_link || '').trim() || !!(v && String(v).trim()) || 'Enter button text, or clear the button link']" />
+              </v-col>
+              <v-col cols="6">
+                <v-text-field v-model="form.button_link" label="Button link" variant="outlined" density="comfortable" :rules="buttonLinkRules" />
+              </v-col>
             </v-row>
 
             <v-row dense class="mb-2">
-              <v-col cols="6"><v-text-field v-model="form.start_date" type="date" label="Start Date" variant="outlined" density="comfortable" /></v-col>
-              <v-col cols="6"><v-text-field v-model="form.end_date" type="date" label="End Date" variant="outlined" density="comfortable" /></v-col>
+              <v-col cols="6">
+                <v-text-field v-model="form.start_date" type="date" label="Start date" variant="outlined" density="comfortable" :rules="[v => !v || !form.end_date || v <= form.end_date || 'Start date must be on or before the end date']" />
+              </v-col>
+              <v-col cols="6">
+                <v-text-field v-model="form.end_date" type="date" label="End date" variant="outlined" density="comfortable" :rules="[v => !v || !form.start_date || v >= form.start_date || 'End date must be on or after the start date']" />
+              </v-col>
             </v-row>
 
             <v-row dense>
-              <v-col cols="6"><v-text-field v-model.number="form.display_order" type="number" label="Display Order" variant="outlined" density="comfortable" /></v-col>
+              <v-col cols="6">
+                <v-text-field v-model.number="form.display_order" type="number" label="Display order" variant="outlined" density="comfortable" :rules="[v => v === '' || v == null || (Number.isFinite(Number(v)) && Number(v) >= 0) || 'Display order must be 0 or more']" />
+              </v-col>
               <v-col cols="6"><v-switch v-model="form.status" color="primary" true-value="active" false-value="inactive" label="Active" hide-details /></v-col>
             </v-row>
           </v-form>
@@ -102,6 +117,7 @@ import { PageTitles } from '~/constants/pageTitles.js'
 
 import { useBanners } from '~/composables/useBanners.js'
 import { StorageService } from '~/services/StorageService.js'
+import { StorageBucket } from '~/enums/storageBucket.js'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
 useHead({ title: PageTitles.ADMIN_BANNERS || 'Banners' })
@@ -109,6 +125,28 @@ useHead({ title: PageTitles.ADMIN_BANNERS || 'Banners' })
 const { banners, loading, saving, fetchAllBanners, createBanner, updateBanner, deleteBanner } = useBanners()
 const dialog = ref(false)
 const formRef = ref(null)
+const formError = ref('')
+const imageError = ref('')
+
+const buttonLinkRules = [
+  (value) => !String(form.button_text || '').trim() || !!(value && String(value).trim()) || 'Enter a link, or clear the button text',
+  (value) => {
+    const link = String(value || '').trim()
+    if (!link) return true
+    return /^(https?:\/\/|\/)/.test(link) || 'Use a full link starting with https:// or a page path starting with /'
+  },
+]
+
+function explainBannerError(message) {
+  const text = String(message || '')
+  if (/image_url/i.test(text) && /null/i.test(text)) {
+    return 'The database still requires a banner image. Run the banner update in supabase/storefront_content.sql, then save again.'
+  }
+  if (/column/i.test(text) && /schema cache/i.test(text)) {
+    return 'A field on this form does not match the banners table. Refresh the page and try again.'
+  }
+  return text || 'Could not save this banner. Check the fields and try again.'
+}
 
 const defaultForm = {
   id: null,
@@ -126,15 +164,21 @@ const defaultForm = {
 
 const form = reactive({ ...defaultForm })
 
+watch(() => form.image.length, (count) => {
+  if (count) imageError.value = ''
+})
+
 const editBanner = (banner) => {
+  formError.value = ''
+  imageError.value = ''
   Object.assign(form, {
     id: banner.id,
-    image: [],
-    image_url: banner.image_url,
+    image: banner.image_url ? [banner.image_url] : [],
+    image_url: banner.image_url || '',
     title: banner.title || '',
     subtitle: banner.subtitle || '',
     button_text: banner.button_text || '',
-    button_link: banner.link || '',
+    button_link: banner.button_link || '',
     start_date: banner.start_date ? banner.start_date.split('T')[0] : '',
     end_date: banner.end_date ? banner.end_date.split('T')[0] : '',
     display_order: banner.display_order || 1,
@@ -145,43 +189,63 @@ const editBanner = (banner) => {
 
 const closeDialog = () => {
   dialog.value = false
+  formError.value = ''
+  imageError.value = ''
   Object.assign(form, defaultForm)
 }
 
 const saveBanner = async () => {
-  let finalImageUrl = form.image_url
-  
-  // Handle image upload if a new file is selected
-  if (form.image && form.image.length > 0) {
-    const file = form.image[0]
-    if (file instanceof File) {
-      const path = `banner_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
-      finalImageUrl = await StorageService.uploadBannerImage(path, file)
+  formError.value = ''
+  imageError.value = form.image?.length ? '' : 'Add a banner image'
+  const { valid } = await formRef.value.validate()
+  if (!valid || imageError.value) {
+    formError.value = 'Fix the highlighted fields before saving.'
+    return
+  }
+
+  let finalImageUrl = ''
+
+  try {
+    if (form.image && form.image.length > 0) {
+      const file = form.image[0]
+      if (file instanceof File) {
+        const path = `banner_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+        const uploaded = await StorageService.upload(StorageBucket.BANNERS, path, file)
+        finalImageUrl = StorageService.getPublicUrl(StorageBucket.BANNERS, uploaded?.path || path)
+      } else if (typeof file === 'string') {
+        finalImageUrl = file
+      }
     }
+  } catch (err) {
+    imageError.value = err.message || 'The banner image could not be uploaded.'
+    formError.value = imageError.value
+    return
+  }
+
+  if (!finalImageUrl) {
+    imageError.value = 'Add a banner image'
+    formError.value = 'Fix the highlighted fields before saving.'
+    return
   }
 
   const payload = {
-    title: form.title,
-    subtitle: form.subtitle,
+    title: form.title.trim(),
+    subtitle: form.subtitle.trim() || null,
     image_url: finalImageUrl,
-    button_text: form.button_text,
-    link: form.button_link, // Mapped button_link to link in DB
+    button_text: form.button_text.trim() || null,
+    button_link: form.button_link.trim() || null,
     start_date: form.start_date ? new Date(form.start_date).toISOString() : null,
     end_date: form.end_date ? new Date(form.end_date).toISOString() : null,
-    display_order: form.display_order,
-    status: form.status
+    display_order: Number.isFinite(form.display_order) ? form.display_order : 1,
+    status: form.status || 'active'
   }
 
-  let success = false
-  if (form.id) {
-    success = await updateBanner(form.id, payload)
-  } else {
-    success = await createBanner(payload)
+  const result = form.id ? await updateBanner(form.id, payload) : await createBanner(payload)
+  if (result?.ok === false) {
+    formError.value = explainBannerError(result.message)
+    return
   }
-
-  if (success) {
-    closeDialog()
-  }
+  if (result) closeDialog()
 }
 
 const handleDelete = async (id) => {

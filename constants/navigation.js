@@ -65,6 +65,11 @@ export const AdminNavItems = Object.freeze([
     to: Routes.ADMIN_BANNERS,
   },
   {
+    title: 'Reviews',
+    icon: 'mdi-comment-quote-outline',
+    to: Routes.ADMIN_REVIEWS,
+  },
+  {
     title: 'Reports',
     icon: 'mdi-chart-bar',
     to: Routes.ADMIN_REPORTS,

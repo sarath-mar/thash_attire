@@ -30,11 +30,12 @@
     </AdminDataTable>
 
     <AdminFormDialog v-model="dialogOpen" :title="editing ? 'Edit Category' : 'Add Category'" :loading="saving" @save="saveCategory">
+      <v-alert v-if="formError" type="error" variant="tonal" density="compact" class="mb-4">{{ formError }}</v-alert>
       <v-form ref="formRef">
-        <v-text-field v-model="form.name" label="Category Name *" variant="outlined" density="comfortable" class="mb-3" :rules="[v => !!v || 'Required']" />
-        <v-textarea v-model="form.description" label="Description" variant="outlined" density="comfortable" rows="2" class="mb-3" />
-        <v-text-field v-model="form.image_url" label="Image URL" variant="outlined" density="comfortable" class="mb-3" />
-        <v-text-field v-model.number="form.sort_order" label="Sort Order" type="number" variant="outlined" density="comfortable" />
+        <v-text-field v-model="form.name" label="Category Name *" variant="outlined" density="comfortable" class="mb-3" :rules="[v => !!(v && String(v).trim()) || 'Enter a category name']" />
+        <v-textarea v-model="form.description" label="Description" variant="outlined" density="comfortable" rows="2" class="mb-3" :rules="[v => !v || String(v).trim().length <= 300 || 'Description must be 300 characters or less']" />
+        <v-text-field v-model="form.image_url" label="Image URL" variant="outlined" density="comfortable" class="mb-3" :rules="[v => !String(v || '').trim() || /^(https?:\/\/|\/)/.test(String(v).trim()) || 'Use a full image link starting with https:// or a path starting with /']" />
+        <v-text-field v-model.number="form.sort_order" label="Sort Order" type="number" variant="outlined" density="comfortable" :rules="[v => v === '' || v == null || (Number.isFinite(Number(v)) && Number(v) >= 0) || 'Sort order must be 0 or more']" />
       </v-form>
     </AdminFormDialog>
 
@@ -63,6 +64,8 @@ const deleteDialog = ref(false)
 const categoryToDelete = ref(null)
 const deleting = ref(false)
 const form = reactive({ name: '', description: '', image_url: '', sort_order: 1 })
+const formRef = ref(null)
+const formError = ref('')
 
 const headers = [
   { title: '', key: 'image', sortable: false, width: 56 },
@@ -86,12 +89,19 @@ const load = async () => {
 }
 
 const openDialog = (cat = null) => {
+  formError.value = ''
   editing.value = cat
   Object.assign(form, cat || { name: '', description: '', image_url: '', sort_order: categories.value.length + 1 })
   dialogOpen.value = true
 }
 
 const saveCategory = async () => {
+  formError.value = ''
+  const { valid } = await formRef.value.validate()
+  if (!valid) {
+    formError.value = 'Fix the highlighted fields before saving.'
+    return
+  }
   saving.value = true
   try {
     if (editing.value) {
@@ -104,7 +114,8 @@ const saveCategory = async () => {
     dialogOpen.value = false
     await load()
   } catch (err) {
-    showError(err.message)
+    formError.value = err.message || 'Could not save this category.'
+    showError(formError.value)
   } finally {
     saving.value = false
   }

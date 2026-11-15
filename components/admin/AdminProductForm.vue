@@ -4,10 +4,10 @@
     <AdminFormSection title="Basic Information" subtitle="Product name, category and status">
       <v-row dense>
         <v-col cols="12" md="8">
-          <v-text-field v-model="form.name" label="Product Name *" variant="outlined" density="comfortable" :rules="[rules.required]" />
+          <v-text-field v-model="form.name" label="Product Name *" variant="outlined" density="comfortable" :rules="[v => !!(v && String(v).trim()) || 'Enter a product name']" />
         </v-col>
         <v-col cols="12" md="4">
-          <v-text-field v-model="form.sku" label="SKU *" variant="outlined" density="comfortable" :rules="[rules.required]" />
+          <v-text-field v-model="form.sku" label="SKU *" variant="outlined" density="comfortable" :rules="[v => !!(v && String(v).trim()) || 'Enter a SKU']" />
         </v-col>
         <v-col cols="12" md="6">
           <v-select
@@ -18,7 +18,7 @@
             label="Category *"
             variant="outlined"
             density="comfortable"
-            :rules="[rules.required]"
+            :rules="[v => !!v || 'Choose a category']"
           />
         </v-col>
         <v-col cols="12" md="6">
@@ -114,13 +114,13 @@
     <AdminFormSection title="Production Costs" subtitle="Stitching, packaging and other costs">
       <v-row dense>
         <v-col cols="12" md="4">
-          <v-text-field v-model.number="form.stitching_cost" label="Stitching Cost" type="number" prefix="₹" variant="outlined" density="comfortable" />
+          <v-text-field v-model.number="form.stitching_cost" label="Stitching Cost" type="number" prefix="₹" variant="outlined" density="comfortable" :rules="[nonNegative('Stitching cost')]" />
         </v-col>
         <v-col cols="12" md="4">
-          <v-text-field v-model.number="form.packaging_cost" label="Packaging / Common Cost" type="number" prefix="₹" variant="outlined" density="comfortable" />
+          <v-text-field v-model.number="form.packaging_cost" label="Packaging / Common Cost" type="number" prefix="₹" variant="outlined" density="comfortable" :rules="[nonNegative('Packaging cost')]" />
         </v-col>
         <v-col cols="12" md="4">
-          <v-text-field v-model.number="form.other_cost" label="Other Product Cost" type="number" prefix="₹" variant="outlined" density="comfortable" />
+          <v-text-field v-model.number="form.other_cost" label="Other Product Cost" type="number" prefix="₹" variant="outlined" density="comfortable" :rules="[nonNegative('Other cost')]" />
         </v-col>
       </v-row>
 
@@ -145,7 +145,7 @@
         </v-col>
         <template v-if="form.createInitialShowcaseSample">
           <v-col cols="12" md="6">
-            <v-text-field v-model.number="form.showcaseStitchingCost" label="Showcase Stitching Cost" type="number" prefix="₹" variant="outlined" density="comfortable" hint="Stitching cost for the initial showcase piece (materials are the same as regular production)" persistent-hint />
+            <v-text-field v-model.number="form.showcaseStitchingCost" label="Showcase Stitching Cost" type="number" prefix="₹" variant="outlined" density="comfortable" hint="Stitching cost for the initial showcase piece (materials are the same as regular production)" persistent-hint :rules="[nonNegative('Showcase stitching cost')]" />
           </v-col>
         </template>
       </v-row>
@@ -160,10 +160,10 @@
     <AdminFormSection title="Pricing & Profit" subtitle="Selling price and margin analysis">
       <v-row dense>
         <v-col cols="12" md="4">
-          <v-text-field v-model.number="form.selling_price" label="Selling Price *" type="number" prefix="₹" variant="outlined" density="comfortable" :rules="[rules.required]" />
+          <v-text-field v-model.number="form.selling_price" label="Selling Price *" type="number" prefix="₹" variant="outlined" density="comfortable" :rules="[v => Number(v) > 0 || 'Selling price must be greater than 0']" />
         </v-col>
         <v-col cols="12" md="4">
-          <v-text-field v-model.number="form.target_margin" label="Target Profit Margin (%)" type="number" suffix="%" variant="outlined" density="comfortable" />
+          <v-text-field v-model.number="form.target_margin" label="Target Profit Margin (%)" type="number" suffix="%" variant="outlined" density="comfortable" :rules="[nonNegative('Target margin')]" />
         </v-col>
       </v-row>
       <AdminProfitSummary
@@ -177,10 +177,10 @@
     <AdminFormSection title="Inventory" subtitle="Stock levels and thresholds">
       <v-row dense>
         <v-col cols="12" md="4">
-          <v-text-field v-model.number="form.stock" label="Current Stock" type="number" variant="outlined" density="comfortable" />
+          <v-text-field v-model.number="form.stock" label="Current Stock" type="number" variant="outlined" density="comfortable" :rules="[nonNegative('Current stock')]" />
         </v-col>
         <v-col cols="12" md="4">
-          <v-text-field v-model.number="form.low_stock_threshold" label="Low Stock Threshold" type="number" variant="outlined" density="comfortable" />
+          <v-text-field v-model.number="form.low_stock_threshold" label="Low Stock Threshold" type="number" variant="outlined" density="comfortable" :rules="[nonNegative('Low stock threshold')]" />
         </v-col>
         <v-col cols="12" md="4">
           <v-select
@@ -202,10 +202,12 @@
           <v-switch v-model="form.is_showcase" label="Showcase Model (Hidden from public)" color="warning" hide-details />
         </v-col>
         <v-col cols="12" md="4">
-          <v-switch v-model="form.is_featured" label="Featured Product" color="accent" hide-details />
+          <v-switch v-model="form.is_featured" label="Featured" color="accent" hide-details />
+          <p class="text-caption text-medium-emphasis mt-1">Puts this dress in the homepage lookbook. Up to 3 featured dresses are shown. If none are featured, the lookbook uses the newest published dresses.</p>
         </v-col>
         <v-col cols="12" md="4">
-          <v-switch v-model="form.is_trending" label="Trending Product" color="accent" hide-details />
+          <v-switch v-model="form.is_trending" label="Trending" color="accent" hide-details />
+          <p class="text-caption text-medium-emphasis mt-1">Puts this dress in the Trending row on the homepage. That row is hidden when no dress is marked trending.</p>
         </v-col>
       </v-row>
     </AdminFormSection>
@@ -213,7 +215,7 @@
     <!-- Actions -->
     <div class="ta-product-form__actions">
       <v-btn variant="text" :disabled="saving" @click="$emit('cancel')">Cancel</v-btn>
-      <v-btn color="primary" variant="flat" type="submit" :loading="saving" :disabled="!valid">
+      <v-btn color="primary" variant="flat" type="submit" :loading="saving">
         {{ submitLabel }}
       </v-btn>
     </div>
@@ -267,7 +269,7 @@ const defaultForm = () => ({
 
 const form = reactive({ ...defaultForm(), ...props.initialData })
 
-const rules = { required: v => !!v || 'Required' }
+const nonNegative = (label) => (value) => value === '' || value == null || (Number.isFinite(Number(value)) && Number(value) >= 0) || `${label} must be 0 or more`
 
 const statusOptions = Object.entries(ProductStatusLabels).map(([value, label]) => ({ value, label }))
 

@@ -75,12 +75,13 @@
         <v-card-title class="pa-4">Add Expense</v-card-title>
         <v-divider />
         <v-card-text class="pa-4">
+          <v-alert v-if="formError" type="error" variant="tonal" density="compact" class="mb-4">{{ formError }}</v-alert>
           <v-form ref="formRef" @submit.prevent="saveExpense">
-            <v-text-field v-model="form.date" type="date" label="Date" variant="outlined" density="comfortable" class="mb-2" />
-            <v-select v-model="form.category" :items="['Material Purchase', 'Courier', 'Packaging', 'Marketing', 'Other']" label="Category" variant="outlined" density="comfortable" class="mb-2" />
-            <v-text-field v-model.number="form.amount" type="number" label="Amount" prefix="₹" variant="outlined" density="comfortable" class="mb-2" />
-            <v-textarea v-model="form.description" label="Description" variant="outlined" density="comfortable" rows="2" class="mb-2" />
-            <v-textarea v-model="form.notes" label="Notes (optional)" variant="outlined" density="comfortable" rows="2" />
+            <v-text-field v-model="form.date" type="date" label="Date *" variant="outlined" density="comfortable" class="mb-2" :rules="[v => !!v || 'Choose a date']" />
+            <v-select v-model="form.category" :items="['Material Purchase', 'Courier', 'Packaging', 'Marketing', 'Other']" label="Category *" variant="outlined" density="comfortable" class="mb-2" :rules="[v => !!v || 'Choose a category']" />
+            <v-text-field v-model.number="form.amount" type="number" label="Amount *" prefix="₹" variant="outlined" density="comfortable" class="mb-2" :rules="[v => Number(v) > 0 || 'Amount must be greater than 0']" />
+            <v-textarea v-model="form.description" label="Description *" variant="outlined" density="comfortable" rows="2" class="mb-2" :rules="[v => !!(v && String(v).trim()) || 'Enter a description']" />
+            <v-textarea v-model="form.notes" label="Notes" variant="outlined" density="comfortable" rows="2" />
           </v-form>
         </v-card-text>
         <v-divider />
@@ -109,6 +110,7 @@ const filterCategory = ref('All')
 
 const dialog = ref(false)
 const formRef = ref(null)
+const formError = ref('')
 const form = reactive({ date: new Date().toISOString().split('T')[0], category: 'Other', amount: 0, description: '', notes: '' })
 
 const headers = [
@@ -151,7 +153,12 @@ const filteredExpenses = computed(() => {
 })
 
 const saveExpense = async () => {
-  if (form.amount <= 0 || !form.description) return
+  formError.value = ''
+  const { valid } = await formRef.value.validate()
+  if (!valid) {
+    formError.value = 'Fix the highlighted fields before saving.'
+    return
+  }
   
   const payload = {
     ...form,
@@ -159,12 +166,14 @@ const saveExpense = async () => {
   }
   
   const res = await createExpense(payload)
-  if (res) {
-    dialog.value = false
-    formRef.value?.reset()
-    form.date = new Date().toISOString().split('T')[0]
-    form.category = 'Other'
+  if (!res) {
+    formError.value = 'Could not save this expense. Check the fields and try again.'
+    return
   }
+  dialog.value = false
+  formRef.value?.reset()
+  form.date = new Date().toISOString().split('T')[0]
+  form.category = 'Other'
 }
 
 const handleDelete = async (id) => {

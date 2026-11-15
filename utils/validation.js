@@ -10,6 +10,23 @@ export function requiredRule(message = ValidationMessages.REQUIRED) {
   }
 }
 
+export function labeledRequiredRule(label) {
+  return (value) => {
+    if (value == null || String(value).trim() === '' || (Array.isArray(value) && !value.length)) {
+      return `Enter ${label}`
+    }
+    return true
+  }
+}
+
+export function nonNegativeRule(label) {
+  return (value) => {
+    if (value == null || value === '') return true
+    const number = Number(value)
+    return (Number.isFinite(number) && number >= 0) || `${label} must be 0 or more`
+  }
+}
+
 export function emailRule(message = ValidationMessages.EMAIL) {
   return (value) => {
     if (!value) return true

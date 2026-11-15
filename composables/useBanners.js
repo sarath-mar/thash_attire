@@ -42,8 +42,9 @@ export function useBanners() {
       success('Banner created successfully')
       return result
     } catch (err) {
-      showError(err.message || ErrorMessages.GENERIC)
-      return null
+      const message = err.message || ErrorMessages.GENERIC
+      showError(message)
+      return { ok: false, message }
     } finally {
       saving.value = false
     }
@@ -59,8 +60,9 @@ export function useBanners() {
       success('Banner updated successfully')
       return result
     } catch (err) {
-      showError(err.message || ErrorMessages.GENERIC)
-      return null
+      const message = err.message || ErrorMessages.GENERIC
+      showError(message)
+      return { ok: false, message }
     } finally {
       saving.value = false
     }

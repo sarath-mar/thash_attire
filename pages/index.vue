@@ -10,6 +10,16 @@
           <a class="ed-logo" href="#top" @click.prevent="scrollTo('top')">Thash Attire</a>
           <p class="ed-tag">made for one person only</p>
           <div class="ed-icons">
+            <button
+              v-if="!panel && !albumOpen"
+              type="button"
+              class="ed-icon ed-search__toggle"
+              :aria-label="searchExpanded ? 'Close search' : 'Search'"
+              @click="toggleSearch"
+            >
+              <svg v-if="!searchExpanded" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M16 16l4 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+              <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+            </button>
             <button type="button" class="ed-icon ed-tip" data-tip="Orders" aria-label="Orders" @click="openPanel('orders')">
               <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="3.5" width="12" height="17" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9 3.5h6V6H9zM9 11h6M9 14.5h4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
             </button>
@@ -95,7 +105,9 @@
         </section>
 
         <section id="look" class="ed-sec">
-          <div class="ed-lookbook">
+          <p v-if="!catalogReady" class="ed-album__copy">Loading dresses…</p>
+          <p v-else-if="!lookbook.length" class="ed-album__copy">Published dresses will appear here. In admin, set the product to Active and turn off Showcase model.</p>
+          <div v-else class="ed-lookbook">
             <figure v-for="look in lookbook" :key="look.key" class="ed-look ed-rv">
               <button type="button" class="ed-look__open" @click="openProduct(look)">
                 <img :src="look.image" :alt="look.name">
@@ -122,16 +134,17 @@
               </figcaption>
             </figure>
           </div>
-          <button type="button" class="ed-btn" @click="openAllProducts">See more</button>
+          <button v-if="allProducts.length" type="button" class="ed-btn" @click="openAllProducts">See more</button>
         </section>
 
         <section id="work" class="ed-sec">
           <span class="ed-lab ed-rv">our collections</span>
           <h2 class="ed-rv">Every style,<br>made for you.</h2>
-          <div class="ed-cats">
+          <p v-if="catalogReady && !collections.length" class="ed-album__copy">Collections appear after you add a category in admin.</p>
+          <div v-else class="ed-cats">
             <button
               v-for="(collection, index) in collections"
-              :key="collection.title"
+              :key="collection.id"
               type="button"
               class="ed-cat ed-rv"
               @click="openAlbum(index)"
@@ -145,7 +158,52 @@
           </div>
         </section>
 
-        <section id="reviews" class="ed-sec">
+        <section v-if="trending.length" id="trending" class="ed-sec">
+          <span class="ed-lab ed-rv">trending</span>
+          <h2 class="ed-rv">Loved right now.</h2>
+          <div class="ed-lookbook">
+            <figure v-for="look in trending" :key="look.key" class="ed-look ed-rv">
+              <button type="button" class="ed-look__open" @click="openProduct(look)">
+                <img :src="look.image" :alt="look.name">
+              </button>
+              <figcaption>
+                <div>
+                  <strong>{{ look.name }}</strong>
+                  <span>{{ formatCurrency(look.price) }}</span>
+                </div>
+                <div class="ed-look__actions">
+                  <button type="button" class="ed-tip" :data-tip="addedKey === look.key ? 'Added' : 'Add to cart'" aria-label="Add to cart" @click="addLook(look)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8h12l-1 12H7L6 8z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9 8V6a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+                  </button>
+                  <button type="button" class="ed-tip" data-tip="Order now" aria-label="Order now" @click="buyLook(look)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </button>
+                </div>
+              </figcaption>
+            </figure>
+          </div>
+        </section>
+
+        <section v-if="liveOffers.length" id="offers" class="ed-sec">
+          <span class="ed-lab ed-rv">offers</span>
+          <h2 class="ed-rv">Sets, priced together.</h2>
+          <div class="ed-offers">
+            <article v-for="offer in liveOffers" :key="offer.id" class="ed-offer ed-rv">
+              <h3>{{ offer.name }}</h3>
+              <p v-if="offer.description">{{ offer.description }}</p>
+              <ul>
+                <li v-for="line in offer.lines" :key="line.productId">{{ line.name }} × {{ line.quantity }}</li>
+              </ul>
+              <p class="ed-offer__price">
+                <s v-if="offer.regular > offer.price">{{ formatCurrency(offer.regular) }}</s>
+                <strong>{{ formatCurrency(offer.price) }}</strong>
+              </p>
+              <button type="button" class="ed-btn ed-btn--rose" @click="addOffer(offer)">Add set to cart</button>
+            </article>
+          </div>
+        </section>
+
+        <section v-if="reviews.length" id="reviews" class="ed-sec">
           <span class="ed-lab ed-rv">reviews</span>
           <div class="ed-reviews">
             <article
@@ -200,7 +258,8 @@
         <div v-if="albumMode === 'all'" class="ed-catalog">
           <span class="ed-lab">the edit</span>
           <h2>All products</h2>
-          <div class="ed-product-grid">
+          <p v-if="!allProducts.length" class="ed-album__copy">No dresses are published yet.</p>
+          <div v-else class="ed-product-grid">
             <button
               v-for="item in allProducts"
               :key="item.key"
@@ -219,7 +278,8 @@
           <span class="ed-lab">collection</span>
           <h2>{{ activeCollection.title }}</h2>
           <p class="ed-album__copy">{{ activeCollection.description }}</p>
-          <div class="ed-product-grid">
+          <p v-if="!activeCollection.items.length" class="ed-album__copy">Nothing in this collection yet.</p>
+          <div v-else class="ed-product-grid">
             <button
               v-for="item in activeCollection.items"
               :key="item.key"
@@ -247,10 +307,10 @@
             </button>
           </div>
           <div>
-            <span class="ed-lab">{{ activeCollection.title }}</span>
+            <span class="ed-lab">{{ activeLookItem.collectionTitle || activeCollection?.title }}</span>
             <h2>{{ activeLook }}</h2>
             <p class="ed-album__price">{{ formatCurrency(activeLookItem.price) }}</p>
-            <p class="ed-album__copy">{{ activeCollection.description }}</p>
+            <p class="ed-album__copy">{{ activeLookItem.description || activeCollection?.description }}</p>
             <button type="button" class="ed-btn" @click="addLook(activeLookItem)">Add to cart</button>
             <button type="button" class="ed-btn ed-btn--rose" @click="buyLook(activeLookItem)">Buy now</button>
             <div class="ed-thumbs">
@@ -281,25 +341,28 @@
         <button type="button" aria-label="Close" @click="showWhatsappTab = false">×</button>
       </div>
 
-      <div v-if="!panel && !albumOpen" class="ed-search">
-        <input
-          v-model="searchQuery"
-          type="search"
-          placeholder="Search a dress"
-          aria-label="Search a dress"
-          @focus="searchOpen = true"
-          @input="searchOpen = true"
-        >
-        <ul v-if="searchOpen && searchQuery.trim()" class="ed-search__list">
-          <li v-if="!searchResults.length">No dresses match that.</li>
-          <li v-for="item in searchResults" :key="item.key">
-            <button type="button" @click="chooseSearch(item)">
-              <img :src="item.image" :alt="item.name">
-              <span>{{ item.label || item.name }}</span>
-              <b>{{ formatCurrency(item.price) }}</b>
-            </button>
-          </li>
-        </ul>
+      <div v-if="!panel && !albumOpen" class="ed-search" :class="{ 'is-open': searchExpanded }">
+        <div class="ed-search__field">
+          <input
+            ref="searchInput"
+            v-model="searchQuery"
+            type="search"
+            placeholder="Search a dress"
+            aria-label="Search a dress"
+            @focus="searchOpen = true"
+            @input="searchOpen = true"
+          >
+          <ul v-if="searchOpen && searchQuery.trim()" class="ed-search__list">
+            <li v-if="!searchResults.length">No dresses match that.</li>
+            <li v-for="item in searchResults" :key="item.key">
+              <button type="button" @click="chooseSearch(item)">
+                <img :src="item.image" :alt="item.name">
+                <span>{{ item.label || item.name }}</span>
+                <b>{{ formatCurrency(item.price) }}</b>
+              </button>
+            </li>
+          </ul>
+        </div>
       </div>
 
       <div v-if="panel" class="ed-drawer">
@@ -357,6 +420,10 @@ import { DefaultImages } from '~/constants/defaults.js'
 import { getWhatsAppLink } from '~/helpers/phone.js'
 import { formatCurrency } from '~/helpers/currency.js'
 import { ProductService } from '~/services/ProductService.js'
+import { CategoryService } from '~/services/CategoryService.js'
+import { BannerService } from '~/services/BannerService.js'
+import { OfferService } from '~/services/OfferService.js'
+import { ReviewService } from '~/services/ReviewService.js'
 import { StorageService } from '~/services/StorageService.js'
 import { StorageBucket } from '~/enums/storageBucket.js'
 import { CustomerOrderService } from '~/services/CustomerOrderService.js'
@@ -377,33 +444,16 @@ useHead({
 const config = useRuntimeConfig()
 const year = new Date().getFullYear()
 
-const gallery = [
+const fallbackGallery = [
   'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1000&q=80',
   'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=1000&q=80',
   'https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&w=1000&q=80',
   'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=1000&q=80',
   'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?auto=format&fit=crop&w=1000&q=80',
   'https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&w=1000&q=80',
-  'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=1000&q=80',
-  'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1000&q=80',
-  'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1000&q=80',
-  'https://images.unsplash.com/photo-1469334031218-e382a71b716b?auto=format&fit=crop&w=1000&q=80',
-  'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1000&q=80',
-  'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=1000&q=80',
-  'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=1000&q=80',
-  'https://images.unsplash.com/photo-1550614000-4895a10e1bfd?auto=format&fit=crop&w=1000&q=80',
-  'https://images.unsplash.com/photo-1581044777550-4cfa60707c03?auto=format&fit=crop&w=1000&q=80',
-  'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?auto=format&fit=crop&w=1000&q=80',
-  'https://images.unsplash.com/photo-1617019114583-affb34d1b3cd?auto=format&fit=crop&w=1000&q=80',
-  'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?auto=format&fit=crop&w=1000&q=80',
 ]
 
-const heroSlides = gallery.slice(0, 6)
 const heroIndex = ref(0)
-
-function lookPhotos(seed) {
-  return [0, 1, 2].map(step => gallery[(seed + step * 7) % gallery.length])
-}
 
 const palettes = [
   ['#d9707a', '#f5d5d3'],
@@ -414,92 +464,34 @@ const palettes = [
   ['#2f7a5b', '#f4e3b8'],
 ]
 
-const collections = [
-  {
-    title: 'Casual Wear',
-    description: 'Easy everyday dresses, cut for comfort and made to move with you.',
-    looks: ['Everyday Kurta Dress', 'Shirt Dress', 'Tiered Midi', 'Wrap Dress', 'A-line Dress', 'Maxi Dress'],
-    fabrics: 'Cotton, linen, soft crepe',
-  },
-  {
-    title: 'Co-ord Sets',
-    description: 'Matching tops and bottoms, stitched as a pair to your measurements.',
-    looks: ['Linen Co-ord', 'Printed Co-ord', 'Kurti Pant Set', 'Skirt Set', 'Crop Set', 'Palazzo Set'],
-    fabrics: 'Linen, cotton, rayon',
-  },
-  {
-    title: 'Festive Wear',
-    description: 'Rich fabrics and detail for celebrations, made for one person.',
-    looks: ['Mehendi Anarkali', 'Silk Lehenga', 'Sharara Set', 'Embroidered Kurta', 'Festive Gown', 'Saree Blouse'],
-    fabrics: 'Silk, georgette, brocade',
-  },
-  {
-    title: 'Party Gowns',
-    description: 'Statement gowns fitted closely to you and finished by hand.',
-    looks: ['Evening Gown', 'Cocktail Dress', 'Fit & Flare', 'Off-shoulder Gown', 'Satin Slip', 'Tulle Gown'],
-    fabrics: 'Satin, crepe, tulle',
-  },
-  {
-    title: 'Kurti Sets',
-    description: 'Classic kurti sets for work, family and every day in between.',
-    looks: ['Straight Kurti Set', 'A-line Kurti Set', 'Cotton Set', 'Printed Set', 'Anarkali Set', 'Angrakha Set'],
-    fabrics: 'Cotton, rayon, chanderi',
-  },
-  {
-    title: 'Kids Wear',
-    description: 'Soft, comfortable outfits for little ones, made to grow with them.',
-    looks: ['Frock', 'Party Frock', 'Ethnic Set', 'Lehenga Choli', 'Casual Dress', 'Twinning Set'],
-    fabrics: 'Soft cotton, muslin, silk',
-  },
-].map((collection, index) => {
-  const items = collection.looks.map((name, look) => {
-    const seed = index * 6 + look
-    const images = lookPhotos(seed)
-    return {
-      key: `${index}-${look}`,
-      name,
-      price: 1890 + (seed % 7) * 350,
-      images,
-      image: images[0],
-      collectionIndex: index,
-      lookIndex: look,
-      label: `${name} · ${collection.title}`,
-    }
-  })
-  return {
-    ...collection,
-    palette: palettes[index % palettes.length],
-    image: items[0].image,
-    items,
-    lookImages: items.map(item => item.image),
-  }
-})
-
-const lookbook = collections.slice(0, 3).map(collection => collection.items[0])
-const allProducts = collections.flatMap(collection => collection.items)
-
 const route = useRoute()
 const { isAuthenticated } = useCustomerAuth()
 const { count, addItem } = useCart()
 const cartCount = computed(() => count.value)
 
-const navItems = [
-  { id: 'look', label: 'Lookbook' },
-  { id: 'work', label: 'Collections' },
-  { id: 'reviews', label: 'Reviews' },
-]
+const navItems = computed(() => {
+  const items = [
+    { id: 'look', label: 'Lookbook' },
+    { id: 'work', label: 'Collections' },
+  ]
+  if (trending.value.length) items.push({ id: 'trending', label: 'Trending' })
+  if (liveOffers.value.length) items.push({ id: 'offers', label: 'Offers' })
+  if (reviews.value.length) items.push({ id: 'reviews', label: 'Reviews' })
+  return items
+})
 
-const reviews = [
-  { quote: '“The kurta dress sat exactly where I asked — waist, hip, and length.”', name: 'Ananya R., Kochi', background: '#f5d5d3' },
-  { quote: '“I sent measurements on WhatsApp. The co-ord arrived ready to wear.”', name: 'Priya Sharma, Bengaluru', background: '#f4e3b8' },
-  { quote: '“No one else at the wedding had this colour, because it was cut for me.”', name: 'Meera V., Thrissur', background: '#d9e8e0' },
-]
+const reviewColors = ['#f5d5d3', '#f4e3b8', '#d9e8e0']
+const reviews = ref([])
 
 const albumOpen = ref(false)
 const albumMode = ref('collection')
 const albumFrom = ref('collection')
 const panel = ref('')
 const shopProducts = ref([])
+const shopCategories = ref([])
+const shopBanners = ref([])
+const shopOffers = ref([])
+const catalogReady = ref(false)
 const orders = ref([])
 const ordersError = ref('')
 const ordersLoading = ref(false)
@@ -509,6 +501,8 @@ const imageIndex = ref(0)
 const addedKey = ref('')
 const searchQuery = ref('')
 const searchOpen = ref(false)
+const searchExpanded = ref(false)
+const searchInput = ref(null)
 const activeSection = ref('how')
 const showWhatsappTab = ref(true)
 
@@ -537,7 +531,131 @@ const panelTitle = computed(() => {
   return 'Your details'
 })
 
-const activeCollection = computed(() => collections[collectionIndex.value] || null)
+const mediaUrl = (path, bucket) => {
+  if (!path) return ''
+  const value = String(path)
+  if (value.startsWith('http') || value.startsWith('/')) return value
+  return StorageService.getPublicUrl(bucket, value) || ''
+}
+
+const productImages = (product) => {
+  const images = (product?.images || [])
+    .map(image => mediaUrl(image, StorageBucket.PRODUCTS))
+    .filter(Boolean)
+  return images.length ? images : [DefaultImages.PRODUCT]
+}
+
+const mapCatalogItem = (product, collectionTitle) => {
+  const images = productImages(product)
+  return {
+    key: product.id,
+    productId: product.id,
+    name: product.name,
+    price: Number(product.selling_price) || 0,
+    images,
+    image: images[0],
+    description: product.description || '',
+    sku: product.sku || '',
+    categoryId: product.category_id,
+    collectionTitle: collectionTitle || '',
+    featured: !!product.is_featured,
+    trending: !!product.is_trending,
+    label: collectionTitle ? `${product.name} · ${collectionTitle}` : product.name,
+  }
+}
+
+const collections = computed(() => {
+  const categories = shopCategories.value.filter(category => category.is_active !== false)
+  const mapped = categories.map((category, index) => {
+    const items = shopProducts.value
+      .filter(product => product.category_id === category.id)
+      .map(product => mapCatalogItem(product, category.name))
+    const cover = mediaUrl(category.image_url, StorageBucket.BANNERS) || items[0]?.image || DefaultImages.PRODUCT
+    return {
+      id: category.id,
+      title: category.name,
+      description: category.description || '',
+      palette: palettes[index % palettes.length],
+      image: cover,
+      items,
+    }
+  })
+  const placed = new Set(mapped.flatMap(collection => collection.items.map(item => item.key)))
+  const loose = shopProducts.value
+    .filter(product => !placed.has(product.id))
+    .map(product => mapCatalogItem(product, ''))
+  if (loose.length) {
+    mapped.push({
+      id: 'uncategorized',
+      title: 'More',
+      description: '',
+      palette: palettes[mapped.length % palettes.length],
+      image: loose[0].image,
+      items: loose,
+    })
+  }
+  return mapped
+})
+
+const allProducts = computed(() => collections.value.flatMap(collection => collection.items))
+
+const lookbook = computed(() => {
+  const featured = allProducts.value.filter(item => item.featured)
+  const source = featured.length ? featured : allProducts.value
+  return source.slice(0, 3)
+})
+
+const trending = computed(() => allProducts.value.filter(item => item.trending).slice(0, 6))
+
+const liveOffers = computed(() => shopOffers.value.map(mapOffer).filter(Boolean))
+
+function mapOffer(offer) {
+  const lines = (offer.offer_items || []).map((item) => {
+    const product = item.product
+    if (!product || product.status !== 'active' || product.is_showcase) return null
+    const images = productImages(product)
+    return {
+      productId: product.id,
+      name: product.name,
+      quantity: Number(item.quantity) || 1,
+      sellingPrice: Number(product.selling_price) || 0,
+      image: images[0],
+      sku: product.sku || '',
+    }
+  }).filter(Boolean)
+  const rawCount = (offer.offer_items || []).length
+  if (!lines.length || lines.length !== rawCount) return null
+  const regular = lines.reduce((sum, line) => sum + line.sellingPrice * line.quantity, 0)
+  const price = Number(offer.offer_price) || 0
+  let remaining = price
+  const priced = lines.map((line, index) => {
+    const lineRegular = line.sellingPrice * line.quantity
+    let lineAmount = regular > 0 ? Number((price * (lineRegular / regular)).toFixed(2)) : 0
+    if (index === lines.length - 1) lineAmount = Number(remaining.toFixed(2))
+    else remaining -= lineAmount
+    return {
+      ...line,
+      unitPrice: line.quantity ? Number((lineAmount / line.quantity).toFixed(2)) : lineAmount,
+    }
+  })
+  return {
+    id: offer.id,
+    name: offer.name,
+    description: offer.description || '',
+    price,
+    regular,
+    lines: priced,
+  }
+}
+
+const heroSlides = computed(() => {
+  const slides = shopBanners.value
+    .map(banner => mediaUrl(banner.image_url, StorageBucket.BANNERS))
+    .filter(Boolean)
+  return slides.length ? slides : fallbackGallery
+})
+
+const activeCollection = computed(() => collections.value[collectionIndex.value] || null)
 
 const activeLookItem = computed(() => activeCollection.value?.items?.[lookIndex.value] || null)
 
@@ -545,7 +663,7 @@ const activeLook = computed(() => activeLookItem.value?.name || '')
 
 const activeLookImages = computed(() => activeLookItem.value?.images || [])
 
-const activeLookImage = computed(() => activeLookImages.value[imageIndex.value] || activeLookItem.value?.image || gallery[0])
+const activeLookImage = computed(() => activeLookImages.value[imageIndex.value] || activeLookItem.value?.image || DefaultImages.PRODUCT)
 
 const lookPalette = computed(() => palettes[(lookIndex.value + collectionIndex.value) % palettes.length])
 
@@ -558,27 +676,20 @@ const pastOrders = computed(() => orders.value.filter(order => pastStatuses.has(
 const searchResults = computed(() => {
   const query = searchQuery.value.trim().toLowerCase()
   if (!query) return []
-  const editorial = collections.flatMap(collection => collection.items)
-  const remote = shopProducts.value.map(product => ({
-    key: product.id,
-    name: product.name,
-    label: product.name,
-    price: Number(product.selling_price) || 0,
-    image: productImage(product),
-  }))
-  return [...remote, ...editorial]
-    .filter(item => `${item.name} ${item.label || ''}`.toLowerCase().includes(query))
+  return allProducts.value
+    .filter(item => `${item.name} ${item.label || ''} ${item.sku || ''}`.toLowerCase().includes(query))
     .slice(0, 6)
 })
 
-const pageIds = ['top', 'look', 'work', 'reviews', 'contact']
-
-const productImage = (product) => {
-  const img = product?.images?.[0]
-  if (!img) return DefaultImages.PRODUCT
-  if (String(img).startsWith('http')) return img
-  return StorageService.getPublicUrl(StorageBucket.PRODUCTS, img) || DefaultImages.PRODUCT
-}
+const pageIds = computed(() => [
+  'top',
+  'look',
+  'work',
+  ...(trending.value.length ? ['trending'] : []),
+  ...(liveOffers.value.length ? ['offers'] : []),
+  ...(reviews.value.length ? ['reviews'] : []),
+  'contact',
+])
 
 const openPanel = (name) => {
   searchOpen.value = false
@@ -611,6 +722,35 @@ function addLook(item) {
   addedKey.value = item.key
 }
 
+function addOffer(offer) {
+  offer.lines.forEach((line) => {
+    addItem({
+      productId: line.productId,
+      name: line.name,
+      price: line.unitPrice,
+      image: line.image,
+      size: '',
+      color: '',
+      quantity: line.quantity,
+      sku: line.sku,
+      offerId: offer.id,
+      offerQty: line.quantity,
+    })
+  })
+  searchOpen.value = false
+  panel.value = 'bag'
+}
+
+function toggleSearch() {
+  searchExpanded.value = !searchExpanded.value
+  if (!searchExpanded.value) {
+    searchOpen.value = false
+    searchQuery.value = ''
+    return
+  }
+  nextTick(() => searchInput.value?.focus())
+}
+
 function buyLook(item) {
   const payload = cartPayload(item)
   if (!payload) return
@@ -622,10 +762,7 @@ function buyLook(item) {
 function chooseSearch(item) {
   searchOpen.value = false
   searchQuery.value = ''
-  if (item.collectionIndex == null) {
-    openAllProducts()
-    return
-  }
+  searchExpanded.value = false
   openProduct(item, 'all')
 }
 
@@ -650,16 +787,79 @@ async function loadOrders() {
   }
 }
 
-async function loadShop() {
-  try {
+async function loadAllProducts() {
+  const pageSize = 100
+  let page = 1
+  let loaded = []
+  let total = Infinity
+  while (loaded.length < total) {
     const result = await ProductService.getAll({
-      limit: 24,
+      page,
+      limit: pageSize,
       sortBy: 'created_at',
       sortOrder: 'desc',
     })
-    shopProducts.value = result.data || []
+    const batch = result.data || []
+    total = result.total ?? batch.length
+    loaded = loaded.concat(batch)
+    if (!batch.length || batch.length < pageSize) break
+    page += 1
+  }
+  return loaded
+}
+
+function bannerIsCurrent(banner, now) {
+  if (banner.start_date && new Date(banner.start_date).getTime() > now) return false
+  if (!banner.end_date) return true
+  const end = new Date(banner.end_date)
+  if (String(banner.end_date).length <= 10) end.setHours(23, 59, 59, 999)
+  return end.getTime() >= now
+}
+
+async function loadOffers() {
+  try {
+    const result = await OfferService.getAll({ status: 'active', limit: 20 })
+    return result.data || []
+  } catch {
+    return []
+  }
+}
+
+async function loadReviews() {
+  try {
+    return await ReviewService.getActive()
+  } catch {
+    return []
+  }
+}
+
+async function loadShop() {
+  try {
+    const [products, categories, banners, offers, reviewRows] = await Promise.all([
+      loadAllProducts(),
+      CategoryService.getAll(),
+      BannerService.getActive(),
+      loadOffers(),
+      loadReviews(),
+    ])
+    const now = Date.now()
+    shopProducts.value = products
+    shopCategories.value = categories || []
+    shopBanners.value = (banners || []).filter(banner => bannerIsCurrent(banner, now))
+    shopOffers.value = (offers || []).filter(offer => bannerIsCurrent(offer, now))
+    reviews.value = (reviewRows || []).map((review, index) => ({
+      quote: review.quote,
+      name: review.city ? `${review.customer_name}, ${review.city}` : review.customer_name,
+      background: reviewColors[index % reviewColors.length],
+    }))
   } catch {
     shopProducts.value = []
+    shopCategories.value = []
+    shopBanners.value = []
+    shopOffers.value = []
+    reviews.value = []
+  } finally {
+    catalogReady.value = true
   }
 }
 
@@ -702,8 +902,13 @@ const openAllProducts = () => {
 }
 
 const openProduct = (item, from = 'collection') => {
-  collectionIndex.value = item.collectionIndex
-  lookIndex.value = item.lookIndex
+  const collectionIdx = collections.value.findIndex(collection =>
+    collection.items.some(entry => entry.key === item.key),
+  )
+  collectionIndex.value = collectionIdx >= 0 ? collectionIdx : 0
+  const items = collections.value[collectionIndex.value]?.items || []
+  const lookIdx = items.findIndex(entry => entry.key === item.key)
+  lookIndex.value = lookIdx >= 0 ? lookIdx : 0
   imageIndex.value = 0
   albumFrom.value = from
   albumMode.value = 'product'
@@ -916,7 +1121,7 @@ const applyMotion = () => {
 
   const viewed = -pos + 48
   let current = ''
-  pageIds.forEach((id) => {
+  pageIds.value.forEach((id) => {
     const section = document.getElementById(id)
     if (section && section.offsetTop <= viewed) current = id
   })
@@ -1065,8 +1270,10 @@ const onTouchEnd = () => {
 }
 
 const onEscape = () => {
-  if (searchOpen.value) {
+  if (searchExpanded.value || searchOpen.value) {
     searchOpen.value = false
+    searchExpanded.value = false
+    searchQuery.value = ''
     return
   }
   if (panel.value) closePanel()
@@ -1078,12 +1285,48 @@ const onKeydown = (event) => {
 }
 
 let heroTimer = 0
+let revealObserver = null
+
+function bindReveals() {
+  const root = scroller.value
+  if (!root) return
+  const pending = root.querySelectorAll('.ed-rv:not(.is-in)')
+  if (!pending.length) return
+  if (reduceMotion) {
+    pending.forEach((item) => item.classList.add('is-in'))
+    return
+  }
+  if (!revealObserver) {
+    revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return
+        entry.target.classList.add('is-in')
+        revealObserver.unobserve(entry.target)
+      })
+    }, { root, threshold: 0.01, rootMargin: '80px 0px' })
+  }
+  root.querySelectorAll('.ed-sec').forEach((section) => {
+    section.querySelectorAll('.ed-rv:not(.is-in)').forEach((item, index) => {
+      if (!item.style.transitionDelay) item.style.transitionDelay = `${Math.min(index, 7) * 80}ms`
+      revealObserver.observe(item)
+    })
+  })
+}
+
+watch(
+  [catalogReady, () => reviews.value.length, () => liveOffers.value.length, () => trending.value.length, () => lookbook.value.length, () => collections.value.length],
+  async () => {
+    await nextTick()
+    bindReveals()
+  },
+)
 
 onMounted(async () => {
   reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   if (!reduceMotion) {
     heroTimer = window.setInterval(() => {
-      heroIndex.value = (heroIndex.value + 1) % heroSlides.length
+      const total = heroSlides.value.length || 1
+      heroIndex.value = (heroIndex.value + 1) % total
     }, 4200)
   }
   if (reduceMotion) cut = 1
@@ -1104,29 +1347,11 @@ onMounted(async () => {
   }
   loadShop()
   if (!reduceMotion) frameId = requestAnimationFrame(loop)
-
-  const revealItems = root?.querySelectorAll('.ed-rv') || []
-  if (reduceMotion) {
-    revealItems.forEach((item) => item.classList.add('is-in'))
-  } else if (root) {
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (!entry.isIntersecting) return
-        entry.target.classList.add('is-in')
-        observer.unobserve(entry.target)
-      })
-    }, { root, threshold: 0.01, rootMargin: '80px 0px' })
-    root.querySelectorAll('.ed-sec').forEach((section) => {
-      section.querySelectorAll('.ed-rv').forEach((item, index) => {
-        item.style.transitionDelay = `${Math.min(index, 7) * 80}ms`
-        observer.observe(item)
-      })
-    })
-    onUnmounted(() => observer.disconnect())
-  }
+  bindReveals()
 })
 
 onUnmounted(() => {
+  revealObserver?.disconnect()
   clearInterval(heroTimer)
   cancelAnimationFrame(frameId)
   frameRef.value?.removeEventListener('wheel', onWheel)
@@ -1596,6 +1821,10 @@ h2 {
   }
 }
 
+.ed-search__toggle {
+  display: none;
+}
+
 .ed-lookbook {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1741,7 +1970,7 @@ h2 {
     padding: 8px;
   }
 
-  button {
+  &__list button {
     width: 100%;
     display: grid;
     grid-template-columns: 42px 1fr auto;
@@ -1942,6 +2171,52 @@ h2 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 14px;
+}
+
+.ed-offers {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.ed-offer {
+  border-radius: 18px;
+  padding: 28px 22px;
+  background: #fffcf7;
+  color: #2a1d20;
+
+  h3 {
+    font-size: clamp(26px, 2vw, 34px);
+    margin-bottom: 10px;
+  }
+
+  p,
+  li {
+    margin: 0;
+    color: #5a4a4d;
+  }
+
+  ul {
+    margin: 12px 0;
+    padding-left: 18px;
+  }
+
+  &__price {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    margin: 12px 0 16px;
+
+    s {
+      color: #8a767a;
+    }
+
+    strong {
+      font-family: "Cormorant Garamond", Georgia, serif;
+      font-size: 28px;
+      color: #231a1d;
+    }
+  }
 }
 
 .ed-review {
@@ -2506,7 +2781,9 @@ h2 {
   }
 
   .ed-logo {
-    font-size: 30px;
+    font-size: 26px;
+    line-height: 1;
+    white-space: nowrap;
   }
 
   .ed-tag,
@@ -2551,19 +2828,39 @@ h2 {
 
   .ed-hero-grid,
   .ed-reviews,
+  .ed-offers,
   .ed-album__body {
     grid-template-columns: 1fr;
   }
 
+  .ed-search__toggle {
+    display: inline-flex;
+    background: var(--ed-bg);
+  }
+
   .ed-search {
-    top: 74px;
-    left: 16px;
-    right: 16px;
+    top: 70px;
+    left: 12px;
+    right: 12px;
+    z-index: 36;
     width: auto;
+
+    &__field {
+      display: none;
+    }
+
+    &.is-open &__field {
+      display: block;
+    }
+
+    input {
+      width: 100%;
+      box-sizing: border-box;
+    }
   }
 
   .ed-hero-copy {
-    padding-top: 64px;
+    padding-top: 8px;
   }
 
   .ed-lookbook,

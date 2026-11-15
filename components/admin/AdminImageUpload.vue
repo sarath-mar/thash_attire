@@ -45,7 +45,7 @@
       />
     </div>
 
-    <p v-if="errorMessage" class="ta-image-upload__error">{{ errorMessage }}</p>
+    <p v-if="error || errorMessage" class="ta-image-upload__error">{{ error || errorMessage }}</p>
   </div>
 </template>
 
@@ -64,6 +64,10 @@ const props = defineProps({
   maxImages: {
     type: Number,
     default: 5,
+  },
+  error: {
+    type: String,
+    default: '',
   },
 })
 

@@ -236,13 +236,25 @@ CREATE TABLE IF NOT EXISTS banners (
   title TEXT,
   subtitle TEXT,
   description TEXT,
-  image_url TEXT NOT NULL,
+  image_url TEXT,
   button_text TEXT,
   button_link TEXT,
   status TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
   display_order INTEGER DEFAULT 1,
   start_date TIMESTAMPTZ,
   end_date TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ─── Reviews ────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS reviews (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  quote TEXT NOT NULL,
+  customer_name TEXT NOT NULL,
+  city TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  sort_order INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -320,6 +332,10 @@ CREATE TRIGGER update_expenses_updated_at
 DROP TRIGGER IF EXISTS update_banners_updated_at ON banners;
 CREATE TRIGGER update_banners_updated_at
   BEFORE UPDATE ON banners FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_reviews_updated_at ON reviews;
+CREATE TRIGGER update_reviews_updated_at
+  BEFORE UPDATE ON reviews FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 DROP TRIGGER IF EXISTS update_settings_updated_at ON settings;
 CREATE TRIGGER update_settings_updated_at
@@ -867,13 +883,16 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.place_customer_order(JSONB, TEXT, TEXT, TEXT, TEXT, TEXT);
+
 CREATE OR REPLACE FUNCTION public.place_customer_order(
   p_items JSONB,
   p_shipping_address TEXT,
   p_payment_method TEXT,
   p_name TEXT DEFAULT NULL,
   p_phone TEXT DEFAULT NULL,
-  p_notes TEXT DEFAULT NULL
+  p_notes TEXT DEFAULT NULL,
+  p_offer_id UUID DEFAULT NULL
 ) RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -896,6 +915,10 @@ DECLARE
   v_color TEXT;
   v_label TEXT;
   v_summary TEXT;
+  v_offer offers%ROWTYPE;
+  v_discount NUMERIC := 0;
+  v_expected INTEGER := 0;
+  v_got INTEGER := 0;
 BEGIN
   IF v_uid IS NULL THEN
     RAISE EXCEPTION 'Please sign in to place an order';
@@ -1003,6 +1026,43 @@ BEGIN
     END IF;
   END LOOP;
 
+  IF p_offer_id IS NOT NULL THEN
+    SELECT * INTO v_offer
+    FROM offers
+    WHERE id = p_offer_id
+      AND status = 'active'
+      AND (start_date IS NULL OR start_date <= NOW())
+      AND (end_date IS NULL OR end_date >= NOW());
+
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'This offer is no longer available';
+    END IF;
+
+    SELECT COUNT(*) INTO v_expected FROM offer_items WHERE offer_id = p_offer_id;
+    SELECT COUNT(*) INTO v_got FROM jsonb_array_elements(p_items);
+
+    IF v_expected <> v_got OR v_expected = 0 THEN
+      RAISE EXCEPTION 'This offer is no longer available';
+    END IF;
+
+    IF EXISTS (
+      SELECT 1
+      FROM offer_items oi
+      WHERE oi.offer_id = p_offer_id
+        AND NOT EXISTS (
+          SELECT 1
+          FROM jsonb_array_elements(p_items) AS cart
+          WHERE (cart->>'product_id')::uuid = oi.product_id
+            AND COALESCE((cart->>'quantity')::int, 0) = oi.quantity
+        )
+    ) THEN
+      RAISE EXCEPTION 'This offer is no longer available';
+    END IF;
+
+    v_discount := GREATEST(v_final - COALESCE(v_offer.offer_price, 0), 0);
+    v_final := COALESCE(v_offer.offer_price, v_final);
+  END IF;
+
   IF array_length(v_names, 1) > 1 THEN
     v_summary := v_names[1] || ' + ' || (array_length(v_names, 1) - 1)::TEXT || ' more';
   ELSE
@@ -1015,6 +1075,8 @@ BEGIN
     product_name = v_summary,
     quantity = v_total_qty,
     selling_price = v_first_price,
+    discount = v_discount,
+    offer_id = p_offer_id,
     final_amount = v_final,
     updated_at = NOW()
   WHERE id = v_sale_id;
@@ -1036,8 +1098,8 @@ $$;
 
 REVOKE ALL ON FUNCTION public.upsert_my_customer_profile(TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.upsert_my_customer_profile(TEXT, TEXT, TEXT, TEXT) TO authenticated;
-REVOKE ALL ON FUNCTION public.place_customer_order(JSONB, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.place_customer_order(JSONB, TEXT, TEXT, TEXT, TEXT, TEXT) TO authenticated;
+REVOKE ALL ON FUNCTION public.place_customer_order(JSONB, TEXT, TEXT, TEXT, TEXT, TEXT, UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.place_customer_order(JSONB, TEXT, TEXT, TEXT, TEXT, TEXT, UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.is_staff() TO authenticated, service_role;
 
@@ -1057,6 +1119,7 @@ ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sale_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE banners ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
 
 -- Public storefront reads
@@ -1071,6 +1134,10 @@ CREATE POLICY "Public read categories" ON categories
 CREATE POLICY "Public read active banners" ON banners
   FOR SELECT TO anon, authenticated
   USING (status = 'active');
+
+CREATE POLICY "Public read active reviews" ON reviews
+  FOR SELECT TO anon, authenticated
+  USING (is_active = TRUE);
 
 CREATE POLICY "Public read active offers" ON offers
   FOR SELECT TO anon, authenticated
@@ -1131,6 +1198,8 @@ CREATE POLICY "Customers read own sale items" ON sale_items
 CREATE POLICY "Staff manage expenses" ON expenses
   FOR ALL TO authenticated USING (public.is_staff()) WITH CHECK (public.is_staff());
 CREATE POLICY "Staff manage banners" ON banners
+  FOR ALL TO authenticated USING (public.is_staff()) WITH CHECK (public.is_staff());
+CREATE POLICY "Staff manage reviews" ON reviews
   FOR ALL TO authenticated USING (public.is_staff()) WITH CHECK (public.is_staff());
 CREATE POLICY "Staff manage settings" ON settings
   FOR ALL TO authenticated USING (public.is_staff()) WITH CHECK (public.is_staff());

@@ -8,7 +8,7 @@ function requireClient() {
 }
 
 export const CustomerOrderService = {
-  async placeOrder({ items, shippingAddress, paymentMethod, name, phone, notes }) {
+  async placeOrder({ items, shippingAddress, paymentMethod, name, phone, notes, offerId }) {
     const supabase = requireClient()
     const { data, error } = await supabase.rpc('place_customer_order', {
       p_items: items,
@@ -17,6 +17,7 @@ export const CustomerOrderService = {
       p_name: name || null,
       p_phone: phone || null,
       p_notes: notes || null,
+      p_offer_id: offerId || null,
     })
 
     if (error) throw new Error(mapCustomerAuthError(error, 'We could not place your order'))

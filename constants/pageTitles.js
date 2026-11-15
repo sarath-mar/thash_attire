@@ -31,6 +31,7 @@ export const PageTitles = Object.freeze({
   ADMIN_CUSTOMER_DETAIL: 'Customer Details',
   ADMIN_EXPENSES: 'Expenses',
   ADMIN_BANNERS: 'Banners',
+  ADMIN_REVIEWS: 'Reviews',
   ADMIN_REPORTS: 'Reports',
   ADMIN_SETTINGS: 'Settings',
 })

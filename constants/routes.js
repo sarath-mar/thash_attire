@@ -32,6 +32,7 @@ export const Routes = Object.freeze({
   ADMIN_CUSTOMER_DETAIL: (id) => `/admin/customers/${id}`,
   ADMIN_EXPENSES: '/admin/expenses',
   ADMIN_BANNERS: '/admin/banners',
+  ADMIN_REVIEWS: '/admin/reviews',
   ADMIN_REPORTS: '/admin/reports',
   ADMIN_SETTINGS: '/admin/settings',
   ADMIN_OFFERS: '/admin/offers',

@@ -47,7 +47,12 @@
         />
       </label>
 
-      <v-form v-if="step === 'phone'" ref="phoneForm" class="ta-bag__form" @submit.prevent="continuePhone">
+      <div v-if="!isAuthenticated" class="ta-bag__confirm">
+        <p class="ta-bag__lead">Sign in to place this order. Thash Attire confirms it from the admin orders list.</p>
+        <NuxtLink class="ta-bag__signin" :to="{ path: '/login', query: { redirect: '/?panel=bag' } }">Sign in</NuxtLink>
+      </div>
+
+      <v-form v-else-if="step === 'phone'" ref="phoneForm" class="ta-bag__form" @submit.prevent="continuePhone">
         <p class="ta-bag__lead">Enter your mobile number to place this order.</p>
         <CommonAppTextField
           v-model="phone"
@@ -100,6 +105,14 @@ watch(profile, (value) => {
   if (value?.phone && !phone.value) phone.value = value.phone
 }, { immediate: true })
 
+function sharedOfferId(cartItems) {
+  if (!cartItems.length) return null
+  const offerId = cartItems[0].offerId
+  if (!offerId) return null
+  const sameSet = cartItems.every(item => item.offerId === offerId && item.quantity === item.offerQty)
+  return sameSet ? offerId : null
+}
+
 async function continuePhone() {
   const { valid } = await phoneForm.value.validate()
   if (!valid) return
@@ -120,35 +133,31 @@ async function confirmOrder() {
     : 'Confirm with the customer, then collect payment.'
   let number = `TA${Date.now().toString().slice(-8)}`
   try {
-    if (catalogCheckout.value && isAuthenticated.value) {
-      const order = await CustomerOrderService.placeOrder({
-        items: items.value.map(item => ({
-          product_id: item.productId,
-          quantity: item.quantity,
-          size: item.size,
-          color: item.color,
-        })),
-        shippingAddress: profile.value?.address?.trim()?.length >= 8
-          ? profile.value.address.trim()
-          : 'To be confirmed with you',
-        paymentMethod: 'upi',
-        name: profile.value?.name || 'Customer',
-        phone: mobile,
-        notes,
-      })
-      number = order?.order_number || number
-    } else {
-      const saved = JSON.parse(localStorage.getItem('thash-attire-orders') || '[]')
-      saved.unshift({
-        number,
-        phone: mobile,
-        note: customerNote,
-        total: subtotal.value,
-        items: items.value.map(item => ({ name: item.name, quantity: item.quantity, price: item.price })),
-        placedAt: new Date().toISOString(),
-      })
-      localStorage.setItem('thash-attire-orders', JSON.stringify(saved.slice(0, 20)))
+    if (!isAuthenticated.value) {
+      showError('Sign in to place this order')
+      return
     }
+    if (!catalogCheckout.value) {
+      showError('One of these dresses is no longer available. Remove it and add it again from the shop.')
+      return
+    }
+    const order = await CustomerOrderService.placeOrder({
+      items: items.value.map(item => ({
+        product_id: item.productId,
+        quantity: item.quantity,
+        size: item.size,
+        color: item.color,
+      })),
+      shippingAddress: profile.value?.address?.trim()?.length >= 8
+        ? profile.value.address.trim()
+        : 'To be confirmed with you',
+      paymentMethod: 'upi',
+      name: profile.value?.name || 'Customer',
+      phone: mobile,
+      notes,
+      offerId: sharedOfferId(items.value),
+    })
+    number = order?.order_number || number
     clear()
     placed.value = { number, phone: mobile, note: customerNote }
     note.value = ''
@@ -179,13 +188,15 @@ async function confirmOrder() {
     gap: var(--spacing-sm);
   }
 
-  &__change {
+  &__change,
+  &__signin {
     @include button-reset;
     justify-self: start;
     color: var(--color-accent);
     font-size: 0.8rem;
     font-weight: 600;
     margin-bottom: var(--spacing-sm);
+    text-decoration: none;
   }
 
   &__placed {

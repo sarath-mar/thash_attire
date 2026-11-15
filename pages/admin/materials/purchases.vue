@@ -23,6 +23,8 @@
     </AdminDataTable>
 
     <AdminFormDialog v-model="dialogOpen" title="Record Purchase" icon="mdi-cart-plus" :loading="saving" max-width="640" save-text="Record Purchase" @save="savePurchase">
+      <v-alert v-if="formError" type="error" variant="tonal" density="compact" class="mb-4">{{ formError }}</v-alert>
+      <v-form ref="formRef">
       <v-autocomplete
         v-model="form.material_id"
         :items="allMaterials"
@@ -32,20 +34,21 @@
         variant="outlined"
         density="comfortable"
         class="mb-3"
+        :rules="[v => !!v || 'Choose a material']"
         @update:model-value="onMaterialSelect"
       />
       <v-row dense>
         <v-col cols="6">
-          <CommonAppDatePicker v-model="form.purchase_date" label="Purchase Date *" variant="outlined" density="comfortable" />
+          <CommonAppDatePicker v-model="form.purchase_date" label="Purchase Date *" variant="outlined" density="comfortable" :rules="[v => !!v || 'Choose a purchase date']" />
         </v-col>
         <v-col cols="6">
           <v-text-field v-model="form.supplier" label="Supplier" variant="outlined" density="comfortable" />
         </v-col>
         <v-col cols="6">
-          <v-text-field v-model.number="form.quantity" label="Quantity *" type="number" variant="outlined" density="comfortable" :suffix="selectedMaterial?.unit" />
+          <v-text-field v-model.number="form.quantity" label="Quantity *" type="number" variant="outlined" density="comfortable" :suffix="selectedMaterial?.unit" :rules="[v => Number(v) > 0 || 'Quantity must be greater than 0']" />
         </v-col>
         <v-col cols="6">
-          <v-text-field v-model.number="form.total_amount" label="Total Purchase Amount *" type="number" prefix="₹" variant="outlined" density="comfortable" hint="Total amount paid for entire quantity" persistent-hint />
+          <v-text-field v-model.number="form.total_amount" label="Total Purchase Amount *" type="number" prefix="₹" variant="outlined" density="comfortable" hint="Total amount paid for entire quantity" persistent-hint :rules="[v => v != null && v !== '' && Number(v) >= 0 || 'Enter the total amount paid']" />
         </v-col>
       </v-row>
 
@@ -63,6 +66,7 @@
       />
 
       <v-textarea v-model="form.notes" label="Notes" variant="outlined" density="comfortable" rows="2" class="mt-4" />
+      </v-form>
     </AdminFormDialog>
 
     <AdminConfirmDialog v-model="deleteDialog" title="Delete Purchase" message="Delete this purchase record?" :loading="deleting" @confirm="handleDelete" />
@@ -79,7 +83,6 @@ definePageMeta({ layout: 'admin', middleware: 'admin' })
 useHead({ title: PageTitles.ADMIN_MATERIAL_PURCHASES })
 
 const { purchases, loading, fetchPurchases, createPurchase, deletePurchase, saving } = useMaterialPurchases()
-const { error: showError } = useSnackbar()
 
 const allMaterials = ref([])
 const dialogOpen = ref(false)
@@ -87,6 +90,9 @@ const deleteDialog = ref(false)
 const purchaseToDelete = ref(null)
 const deleting = ref(false)
 const selectedMaterial = ref(null)
+
+const formRef = ref(null)
+const formError = ref('')
 
 const form = reactive({
   material_id: null,
@@ -115,16 +121,10 @@ const onMaterialSelect = (id) => {
 const onSearch = (q) => fetchPurchases(null, q)
 
 const savePurchase = async () => {
-  if (!form.material_id) {
-    showError('Please select a material')
-    return
-  }
-  if (!form.quantity || form.quantity <= 0) {
-    showError('Quantity must be greater than 0')
-    return
-  }
-  if (form.total_amount == null || form.total_amount < 0) {
-    showError('Enter a valid total purchase amount')
+  formError.value = ''
+  const { valid } = await formRef.value.validate()
+  if (!valid) {
+    formError.value = 'Fix the highlighted fields before saving.'
     return
   }
 
@@ -132,19 +132,21 @@ const savePurchase = async () => {
     ...form,
     unit: selectedMaterial.value?.unit,
   })
-  if (result) {
-    dialogOpen.value = false
-    Object.assign(form, {
-      material_id: null,
-      purchase_date: formatDateApi(new Date()),
-      quantity: null,
-      total_amount: null,
-      supplier: '',
-      notes: '',
-    })
-    selectedMaterial.value = null
-    allMaterials.value = await MaterialService.getAll()
+  if (!result) {
+    formError.value = 'Could not record this purchase. Check the fields and try again.'
+    return
   }
+  dialogOpen.value = false
+  Object.assign(form, {
+    material_id: null,
+    purchase_date: formatDateApi(new Date()),
+    quantity: null,
+    total_amount: null,
+    supplier: '',
+    notes: '',
+  })
+  selectedMaterial.value = null
+  allMaterials.value = await MaterialService.getAll()
 }
 
 const confirmDelete = (p) => { purchaseToDelete.value = p; deleteDialog.value = true }

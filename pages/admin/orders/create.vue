@@ -16,14 +16,14 @@
                 :items="customers"
                 item-title="name"
                 item-value="id"
-                label="Search Customer (Phone or Name)"
+                label="Search Customer (Phone or Name) *"
                 variant="outlined"
                 density="comfortable"
                 :custom-filter="customerFilter"
                 return-object
+                :rules="[v => !!v || 'Choose a customer']"
                 @update:model-value="onCustomerSelect"
                 class="flex-grow-1"
-                hide-details
               >
                 <template #item="{ props, item }">
                   <v-list-item v-bind="props" :title="item.raw.name" :subtitle="item.raw.phone || item.raw.email || 'No phone yet'" />
@@ -60,10 +60,11 @@
                 :items="products"
                 item-title="name"
                 item-value="id"
-                label="Search Product"
+                label="Search Product *"
                 variant="outlined"
                 density="comfortable"
                 return-object
+                :rules="[v => !!v || 'Choose a product']"
                 @update:model-value="onProductSelect"
               >
                 <template #item="{ props, item }">
@@ -92,8 +93,8 @@
                   <tbody>
                     <tr>
                       <td>{{ form.product_name }}</td>
-                      <td><v-text-field v-model.number="form.selling_price" type="number" density="compact" hide-details variant="outlined" /></td>
-                      <td><v-text-field v-model.number="form.quantity" type="number" min="1" density="compact" hide-details variant="outlined" /></td>
+                      <td><v-text-field v-model.number="form.selling_price" type="number" density="compact" variant="outlined" :rules="[v => Number(v) > 0 || 'Enter a price']" /></td>
+                      <td><v-text-field v-model.number="form.quantity" type="number" min="1" density="compact" variant="outlined" :rules="[v => Number(v) >= 1 || 'Quantity must be at least 1']" /></td>
                       <td><strong>{{ formatCurrency(form.selling_price * form.quantity) }}</strong></td>
                     </tr>
                   </tbody>
@@ -108,10 +109,11 @@
                 :items="offers"
                 item-title="name"
                 item-value="id"
-                label="Search Offer / Combo"
+                label="Search Offer / Combo *"
                 variant="outlined"
                 density="comfortable"
                 return-object
+                :rules="[v => !!v || 'Choose a combo offer']"
                 @update:model-value="onOfferSelect"
               >
                 <template #item="{ props, item }">
@@ -223,7 +225,8 @@
               <span class="text-h6 text-primary">{{ formatCurrency(totalAmount) }}</span>
             </div>
 
-            <v-btn color="primary" block size="large" type="submit" :loading="saving" :disabled="!isFormReady">
+            <v-alert v-if="orderError" type="error" variant="tonal" density="compact" class="mb-3">{{ orderError }}</v-alert>
+            <v-btn color="primary" block size="large" type="submit" :loading="saving">
               Create Order
             </v-btn>
             <v-btn variant="text" block class="mt-2" @click="router.push(Routes.ADMIN_ORDERS)">
@@ -241,10 +244,10 @@
         <v-divider />
         <v-card-text class="pa-4">
           <v-form ref="customerFormRef" @submit.prevent="saveCustomer">
-            <v-text-field v-model="customerForm.name" label="Customer Name *" :rules="[v => !!v || 'Required']" variant="outlined" density="comfortable" class="mb-2" />
-            <v-text-field v-model="customerForm.phone" label="Phone Number *" :rules="[v => !!v || 'Required']" variant="outlined" density="comfortable" class="mb-2" />
-            <v-textarea v-model="customerForm.address" label="Address *" :rules="[v => !!v || 'Required']" variant="outlined" density="comfortable" rows="2" class="mb-2" />
-            <v-text-field v-model="customerForm.pincode" label="Pincode *" :rules="[v => !!v || 'Required']" variant="outlined" density="comfortable" class="mb-2" />
+            <v-text-field v-model="customerForm.name" label="Customer Name *" :rules="[v => !!(v && String(v).trim()) || 'Enter the customer name']" variant="outlined" density="comfortable" class="mb-2" />
+            <v-text-field v-model="customerForm.phone" label="Phone Number *" :rules="[v => !!(v && String(v).trim()) || 'Enter a phone number', v => !v || String(v).replace(/\D/g, '').length >= 10 || 'Enter a 10-digit phone number']" variant="outlined" density="comfortable" class="mb-2" />
+            <v-textarea v-model="customerForm.address" label="Address *" :rules="[v => !!(v && String(v).trim()) || 'Enter an address']" variant="outlined" density="comfortable" rows="2" class="mb-2" />
+            <v-text-field v-model="customerForm.pincode" label="Pincode *" :rules="[v => !!(v && String(v).trim()) || 'Enter a pincode', v => !v || /^\d{6}$/.test(String(v).trim()) || 'Pincode must be 6 digits']" variant="outlined" density="comfortable" class="mb-2" />
             <CommonAppDatePicker v-model="customerForm.dob" label="Date of Birth (Optional)" variant="outlined" density="comfortable" class="mb-2" />
           </v-form>
         </v-card-text>
@@ -281,6 +284,7 @@ const { calcRegularTotal, allocateComboPrice } = useOffers()
 
 const formRef = ref(null)
 const valid = ref(false)
+const orderError = ref('')
 const saving = ref(false)
 const orderType = ref('normal')
 
@@ -429,7 +433,15 @@ const isFormReady = computed(() => {
 })
 
 const handleSubmit = async () => {
-  if (!isFormReady.value) return
+  orderError.value = ''
+  const { valid: fieldsValid } = await formRef.value.validate()
+  if (orderType.value === 'combo' && outOfStockProducts.value.length) {
+    orderError.value = 'This combo includes a product that does not have enough stock.'
+  }
+  if (!fieldsValid || orderError.value) {
+    if (!orderError.value) orderError.value = 'Fix the highlighted fields before creating the order.'
+    return
+  }
   saving.value = true
   
   try {
@@ -475,7 +487,8 @@ const handleSubmit = async () => {
     success('Order created successfully')
     router.push(Routes.ADMIN_ORDERS)
   } catch (err) {
-    showError(err.message)
+    orderError.value = err.message || 'Could not create this order.'
+    showError(orderError.value)
   } finally {
     saving.value = false
   }

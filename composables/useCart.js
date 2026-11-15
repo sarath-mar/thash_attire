@@ -39,6 +39,11 @@ export function useCart() {
     const existing = items.value.find(entry => itemKey(entry) === key)
     if (existing) {
       existing.quantity = Math.min(20, existing.quantity + (item.quantity || 1))
+      if (item.offerId) {
+        existing.offerId = item.offerId
+        existing.offerQty = existing.quantity
+        existing.price = Number(item.price) || existing.price
+      }
     } else {
       items.value.push({
         productId: item.productId,
@@ -49,6 +54,8 @@ export function useCart() {
         color: item.color || '',
         sku: item.sku || '',
         quantity: Math.min(20, item.quantity || 1),
+        offerId: item.offerId || '',
+        offerQty: item.offerQty || item.quantity || 1,
       })
     }
     persist()

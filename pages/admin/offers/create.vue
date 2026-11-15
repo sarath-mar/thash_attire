@@ -14,7 +14,7 @@
               v-model="form.name"
               label="Offer Name"
               variant="outlined"
-              :rules="[requiredRule()]"
+              :rules="[requiredRule('Enter an offer name')]"
               placeholder="e.g. Two Dress Combo"
               class="mb-4"
             />
@@ -96,7 +96,7 @@
               label="Offer Price"
               type="number"
               variant="outlined"
-              :rules="[requiredRule(), v => v > 0 || 'Must be greater than 0', v => v < regularTotal || 'Usually lower than regular total']"
+              :rules="[v => v !== '' && v != null || 'Enter an offer price', v => Number(v) > 0 || 'Offer price must be greater than 0', v => !regularTotal || Number(v) < regularTotal || 'Offer price should be lower than the regular total']"
               prefix="₹"
               class="mt-4"
             />
@@ -114,20 +114,23 @@
 
           <v-card elevation="0" border rounded="lg" class="pa-4 mb-4">
             <h3 class="text-subtitle-1 font-weight-semibold mb-3">Schedule</h3>
+            <v-alert v-if="formError" type="error" variant="tonal" density="compact" class="mb-4">{{ formError }}</v-alert>
             <v-text-field
               v-model="form.start_date"
               type="date"
-              label="Start Date (Optional)"
+              label="Start Date"
               variant="outlined"
               density="comfortable"
+              :rules="[v => !v || !form.end_date || v <= form.end_date || 'Start date must be on or before the end date']"
             />
             <v-text-field
               v-model="form.end_date"
               type="date"
-              label="End Date (Optional)"
+              label="End Date"
               variant="outlined"
               density="comfortable"
               :min="form.start_date"
+              :rules="[v => !v || !form.start_date || v >= form.start_date || 'End date must be on or after the start date']"
             />
           </v-card>
 
@@ -142,7 +145,7 @@
               class="mb-4"
             />
             
-            <v-btn color="primary" block size="large" type="submit" :loading="saving" :disabled="!isValid">
+            <v-btn color="primary" block size="large" type="submit" :loading="saving">
               Save Offer
             </v-btn>
           </v-card>
@@ -180,6 +183,7 @@ const form = reactive({
 })
 
 const items = ref([])
+const formError = ref('')
 
 const addProduct = (product) => {
   if (!product) return
@@ -197,11 +201,12 @@ const regularTotal = computed(() => calcRegularTotal(items.value))
 const savings = computed(() => calcSavings(regularTotal.value, form.offer_price))
 const savingsPercentage = computed(() => calcSavingsPercentage(regularTotal.value, form.offer_price))
 
-const isValid = computed(() => items.value.length >= 2 && form.offer_price > 0 && form.name)
-
 const handleSubmit = async () => {
+  formError.value = ''
   const { valid } = await formRef.value.validate()
-  if (!valid || !isValid.value) return
+  if (items.value.length < 2) formError.value = 'Add at least two products to this offer.'
+  else if (items.value.some(item => !(Number(item.quantity) > 0))) formError.value = 'Each product needs a quantity greater than 0.'
+  if (!valid || formError.value) return
 
   saving.value = true
   const offerData = {

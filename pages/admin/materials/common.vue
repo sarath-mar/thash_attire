@@ -27,10 +27,13 @@
     </AdminDataTable>
 
     <AdminFormDialog v-model="dialogOpen" :title="editing ? 'Edit Common Material' : 'Add Common Material'" :loading="saving" @save="saveMaterial">
-      <v-text-field v-model="form.name" label="Material Name *" variant="outlined" density="comfortable" class="mb-3" />
-      <v-select v-model="form.unit" :items="unitOptions" item-title="label" item-value="value" label="Unit" variant="outlined" density="comfortable" class="mb-3" />
-      <v-text-field v-model="form.supplier" label="Supplier" variant="outlined" density="comfortable" class="mb-3" />
-      <v-text-field v-model.number="form.min_stock_level" label="Minimum Stock" type="number" variant="outlined" density="comfortable" />
+      <v-alert v-if="formError" type="error" variant="tonal" density="compact" class="mb-4">{{ formError }}</v-alert>
+      <v-form ref="formRef">
+        <v-text-field v-model="form.name" label="Material Name *" variant="outlined" density="comfortable" class="mb-3" :rules="[v => !!(v && String(v).trim()) || 'Enter a material name']" />
+        <v-select v-model="form.unit" :items="unitOptions" item-title="label" item-value="value" label="Unit *" variant="outlined" density="comfortable" class="mb-3" :rules="[v => !!v || 'Choose a unit']" />
+        <v-text-field v-model="form.supplier" label="Supplier" variant="outlined" density="comfortable" class="mb-3" />
+        <v-text-field v-model.number="form.min_stock_level" label="Minimum Stock" type="number" variant="outlined" density="comfortable" :rules="[v => v === '' || v == null || (Number.isFinite(Number(v)) && Number(v) >= 0) || 'Minimum stock must be 0 or more']" />
+      </v-form>
     </AdminFormDialog>
   </div>
 </template>
@@ -60,6 +63,8 @@ const loading = ref(true)
 const dialogOpen = ref(false)
 const editing = ref(null)
 const form = reactive({ name: '', unit: MaterialUnit.PIECE, supplier: '', min_stock_level: 20, type: MaterialType.COMMON })
+const formRef = ref(null)
+const formError = ref('')
 
 const headers = [
   { title: 'Material', key: 'name' },
@@ -91,6 +96,7 @@ const blankForm = () => ({
 })
 
 const openDialog = (mat = null) => {
+  formError.value = ''
   editing.value = mat
   Object.assign(
     form,
@@ -108,8 +114,17 @@ const openDialog = (mat = null) => {
 }
 
 const saveMaterial = async () => {
-  if (editing.value) await updateMaterial(editing.value.id, form)
-  else await createMaterial(form)
+  formError.value = ''
+  const { valid } = await formRef.value.validate()
+  if (!valid) {
+    formError.value = 'Fix the highlighted fields before saving.'
+    return
+  }
+  const result = editing.value ? await updateMaterial(editing.value.id, form) : await createMaterial(form)
+  if (!result) {
+    formError.value = 'Could not save this material. Check the fields and try again.'
+    return
+  }
   dialogOpen.value = false
   await load()
 }

@@ -5,6 +5,11 @@
       subtitle="Configure your store, notifications and account preferences."
     />
 
+    <v-alert type="info" variant="tonal" class="mb-4">
+      These fields are not saved. The shop does not read this page.
+      WhatsApp, Instagram, and the contact email on the website come from the <code>.env</code> file.
+    </v-alert>
+
     <v-card elevation="0" border rounded="lg" class="mb-4">
       <v-tabs v-model="activeTab" color="primary" align-tabs="start">
         <v-tab value="general">General</v-tab>
