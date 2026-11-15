@@ -480,10 +480,15 @@ const applyMotion = () => {
 
   const pages = board.querySelectorAll('.ed-sec')
   const stageH = root.clientHeight
+  const wideMotion = window.innerWidth > 860
+  if (!wideMotion) {
+    cut = 1
+    zipPhase = 0
+  }
   pages.forEach((section, index) => {
     if (index === 0) return
     if (index === pages.length - 1) {
-      section.style.minHeight = `${stageH}px`
+      section.style.minHeight = wideMotion ? `${stageH}px` : ''
       return
     }
     section.style.minHeight = ''
@@ -547,7 +552,7 @@ const applyMotion = () => {
 
   const bottomY = Math.max(seamTop, stageH - iconHeight * 0.42)
   const scissorsY = bottomY - cut * (bottomY - seamTop)
-  const showScissors = cut < 0.98 && pos > -20 && zipPhase < 0.02
+  const showScissors = wideMotion && cut < 0.98 && pos > -20 && zipPhase < 0.02
 
   if (scissors.value) {
     scissors.value.style.top = `${stageTop + scissorsY}px`
@@ -566,12 +571,20 @@ const applyMotion = () => {
   frame.classList.toggle('is-zip', zipping)
   root.classList.toggle('is-open', opened)
   if (first) {
-    first.classList.toggle('is-sheet', opened)
-    first.style.height = `${stageH}px`
-    first.style.minHeight = `${stageH}px`
-    first.style.maxHeight = `${stageH}px`
-    first.style.overflow = 'hidden'
-    const leave = opened ? Math.min(1, Math.max(0, -pos / stageH)) : 0
+    const sheet = wideMotion && opened
+    first.classList.toggle('is-sheet', sheet)
+    if (sheet) {
+      first.style.height = `${stageH}px`
+      first.style.minHeight = `${stageH}px`
+      first.style.maxHeight = `${stageH}px`
+      first.style.overflow = 'hidden'
+    } else {
+      first.style.height = ''
+      first.style.minHeight = ''
+      first.style.maxHeight = ''
+      first.style.overflow = ''
+    }
+    const leave = sheet ? Math.min(1, Math.max(0, -pos / stageH)) : 0
     if (leave > 0.001 && window.innerWidth > 860) {
       const swing = Math.min(1, leave * 1.35)
       const shift = swing * root.clientWidth * 0.42
@@ -614,11 +627,12 @@ const applyMotion = () => {
     if (closing) {
       const swing = apart
       const shift = swing * root.clientWidth * 0.42
-      const tilt = swing * -18
+      const rise = swing * Math.min(stageH * 0.55, 360)
+      const tilt = swing * 18
       last.style.position = 'relative'
-      last.style.zIndex = '5'
+      last.style.zIndex = ''
       last.style.transformOrigin = '0% 100%'
-      last.style.transform = `translate3d(${shift.toFixed(1)}px, 0, 0) rotate(${tilt.toFixed(2)}deg)`
+      last.style.transform = `translate3d(${shift.toFixed(1)}px, ${rise.toFixed(1)}px, 0) rotate(${tilt.toFixed(2)}deg)`
     } else {
       last.style.zIndex = ''
       last.style.transformOrigin = ''
@@ -727,6 +741,10 @@ const onWheel = (event) => {
   event.preventDefault()
   const delta = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX
   goal = null
+  if (window.innerWidth <= 860) {
+    movePage(delta)
+    return
+  }
   if (useToolScroll(delta)) return
   if (cut >= 1) {
     movePage(delta)
@@ -748,12 +766,10 @@ const onTouchMove = (event) => {
   if (!delta) return
   event.preventDefault()
   goal = null
-  if (useToolScroll(delta)) return
-  if (cut >= 1) {
-    movePage(delta)
-    return
+  if (window.innerWidth > 860 && cut < 1 && delta > 0) {
+    cut = Math.min(1, cut + Math.abs(delta) / 280)
   }
-  velocity += -delta * 0.45
+  movePage(delta)
 }
 
 const onKeydown = (event) => {
@@ -1739,35 +1755,19 @@ h2 {
     padding: 22px 22px 8px;
   }
 
-  .ed-line {
-    left: auto;
-    right: 28px;
+  .ed-sec + .ed-sec {
+    margin-top: 28px;
   }
 
   .ed-scissors,
-  .ed-zip {
-    left: auto;
-    right: 8px;
-  }
-
-  .ed-scissors {
-    width: 44px;
-    height: auto;
-  }
-
-  .ed-hero {
-    justify-content: flex-start;
-    padding: 18px 18px 12px;
-  }
-
-  .ed-hero-grid {
-    display: flex;
-    flex-direction: column;
+  .ed-zip,
+  .ed-line {
+    display: none;
   }
 
   .ed-photo-wrap {
-    width: min(100%, 280px);
-    height: 240px;
+    width: 100%;
+    height: min(46vh, 360px);
     flex: 0 0 auto;
     margin-left: auto;
     margin-right: auto;
