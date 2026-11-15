@@ -59,6 +59,7 @@ export default defineNuxtConfig({
       supabaseAnonKey: process.env.NUXT_PUBLIC_SUPABASE_ANON_KEY || '',
       whatsappNumber: process.env.NUXT_PUBLIC_WHATSAPP_NUMBER || '',
       instagramUrl: process.env.NUXT_PUBLIC_INSTAGRAM_URL || '',
+      authRedirectUrl: process.env.NUXT_PUBLIC_AUTH_REDIRECT_URL || '',
     },
   },
 

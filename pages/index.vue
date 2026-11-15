@@ -79,7 +79,14 @@
             </div>
             <div class="ed-panel ed-rv">
               <div class="ed-photo-wrap">
-                <img class="ed-photo" :src="heroPhoto" alt="Thash Attire dress">
+                <img
+                  v-for="(src, index) in heroSlides"
+                  :key="src"
+                  class="ed-photo"
+                  :class="{ 'is-on': index === heroIndex }"
+                  :src="src"
+                  alt="Thash Attire dress"
+                >
                 <span class="ed-photo-tag">Yours</span>
               </div>
               <div class="ed-script">made for you, with love</div>
@@ -89,7 +96,7 @@
 
         <section id="look" class="ed-sec">
           <div class="ed-lookbook">
-            <article v-for="look in lookbook" :key="look.key" class="ed-look ed-rv">
+            <figure v-for="look in lookbook" :key="look.key" class="ed-look ed-rv">
               <button type="button" class="ed-look__open" @click="openProduct(look)">
                 <img :src="look.image" :alt="look.name">
               </button>
@@ -113,7 +120,7 @@
                   </button>
                 </div>
               </figcaption>
-            </article>
+            </figure>
           </div>
           <button type="button" class="ed-btn" @click="openAllProducts">See more</button>
         </section>
@@ -177,8 +184,6 @@
               <button type="button" @click="openPanel('orders')">Orders</button>
               <button type="button" @click="openPanel('profile')">Profile</button>
               <button type="button" @click="openPanel('bag')">Bag</button>
-              <NuxtLink to="/about">About</NuxtLink>
-              <NuxtLink to="/contact">Contact</NuxtLink>
             </span>
             <span>© {{ year }} Thash Attire</span>
           </footer>
@@ -393,7 +398,8 @@ const gallery = [
   'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?auto=format&fit=crop&w=1000&q=80',
 ]
 
-const heroPhoto = gallery[2]
+const heroSlides = gallery.slice(0, 6)
+const heroIndex = ref(0)
 
 function lookPhotos(seed) {
   return [0, 1, 2].map(step => gallery[(seed + step * 7) % gallery.length])
@@ -559,7 +565,6 @@ const searchResults = computed(() => {
     label: product.name,
     price: Number(product.selling_price) || 0,
     image: productImage(product),
-    href: `/products/${product.id}`,
   }))
   return [...remote, ...editorial]
     .filter(item => `${item.name} ${item.label || ''}`.toLowerCase().includes(query))
@@ -617,8 +622,8 @@ function buyLook(item) {
 function chooseSearch(item) {
   searchOpen.value = false
   searchQuery.value = ''
-  if (item.href) {
-    navigateTo(item.href)
+  if (item.collectionIndex == null) {
+    openAllProducts()
     return
   }
   openProduct(item, 'all')
@@ -1072,8 +1077,15 @@ const onKeydown = (event) => {
   if (event.key === 'Escape') onEscape()
 }
 
+let heroTimer = 0
+
 onMounted(async () => {
   reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (!reduceMotion) {
+    heroTimer = window.setInterval(() => {
+      heroIndex.value = (heroIndex.value + 1) % heroSlides.length
+    }, 4200)
+  }
   if (reduceMotion) cut = 1
   const root = scroller.value
   const frame = frameRef.value
@@ -1115,6 +1127,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  clearInterval(heroTimer)
   cancelAnimationFrame(frameId)
   frameRef.value?.removeEventListener('wheel', onWheel)
   frameRef.value?.removeEventListener('touchstart', onTouchStart)
@@ -1593,6 +1606,7 @@ h2 {
 .ed-look {
   position: relative;
   overflow: hidden;
+  margin: 0;
   border-radius: 18px;
   background: var(--ed-card);
   min-height: 360px;
@@ -1772,26 +1786,33 @@ h2 {
 .ed-photo-wrap {
   position: relative;
   width: 100%;
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
+  aspect-ratio: 3 / 4.2;
+  min-height: 560px;
   border-radius: 18px;
   overflow: hidden;
   margin: 0 auto 10px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
 }
 
 .ed-photo {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: center 72%;
   display: block;
+  opacity: 0;
+  transition: opacity 0.9s ease;
+
+  &.is-on {
+    opacity: 1;
+  }
 }
 
 .ed-photo-tag {
   position: absolute;
+  z-index: 2;
   top: 14px;
   right: 14px;
   background: #fffcf7;
@@ -2516,7 +2537,9 @@ h2 {
 
   .ed-photo-wrap {
     width: 100%;
-    height: min(46vh, 360px);
+    height: min(68vh, 560px);
+    min-height: 0;
+    aspect-ratio: auto;
     flex: 0 0 auto;
     margin-left: auto;
     margin-right: auto;

@@ -48,10 +48,10 @@
         <div class="ta-footer__links">
           <h4 class="ta-footer__heading">Collections</h4>
           <ul>
-            <li><NuxtLink to="/products?category=cat-001" class="ta-footer__link">Silk Sarees</NuxtLink></li>
-            <li><NuxtLink to="/products?category=cat-002" class="ta-footer__link">Designer Kurtis</NuxtLink></li>
-            <li><NuxtLink to="/products?category=cat-003" class="ta-footer__link">Indo-Western Gowns</NuxtLink></li>
-            <li><NuxtLink to="/products?category=cat-005" class="ta-footer__link">Bridal Couture</NuxtLink></li>
+            <li><NuxtLink to="/" class="ta-footer__link">Silk Sarees</NuxtLink></li>
+            <li><NuxtLink to="/" class="ta-footer__link">Designer Kurtis</NuxtLink></li>
+            <li><NuxtLink to="/" class="ta-footer__link">Indo-Western Gowns</NuxtLink></li>
+            <li><NuxtLink to="/" class="ta-footer__link">Bridal Couture</NuxtLink></li>
           </ul>
         </div>
 

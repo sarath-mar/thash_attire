@@ -10,6 +10,15 @@ function requireClient() {
   return supabase
 }
 
+function authCallbackUrl() {
+  const configured = String(useRuntimeConfig().public.authRedirectUrl || '').trim().replace(/\/$/, '')
+  if (configured) {
+    return configured.endsWith('/auth/callback') ? configured : `${configured}/auth/callback`
+  }
+  const origin = import.meta.client ? window.location.origin : ''
+  return `${origin}/auth/callback`
+}
+
 export function mapCustomerAuthError(error, fallback = 'Something went wrong. Please try again.') {
   const message = handleSupabaseError(error, fallback)
   if (/upsert_my_customer_profile|place_customer_order|schema cache|could not find the function/i.test(message)) {
@@ -82,7 +91,7 @@ export const CustomerAuthService = {
       email: email.trim().toLowerCase(),
       options: {
         shouldCreateUser: true,
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: authCallbackUrl(),
         data: profile.name ? { full_name: profile.name } : undefined,
       },
     })
@@ -107,7 +116,7 @@ export const CustomerAuthService = {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: authCallbackUrl(),
         queryParams: { prompt: 'select_account' },
       },
     })

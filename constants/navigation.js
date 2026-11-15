@@ -2,9 +2,6 @@ import { Routes } from './routes.js'
 
 export const PublicNavItems = Object.freeze([
   { title: 'Home', to: Routes.HOME },
-  { title: 'Shop', to: Routes.PRODUCTS },
-  { title: 'About', to: Routes.ABOUT },
-  { title: 'Contact', to: Routes.CONTACT },
 ])
 
 export const AdminNavItems = Object.freeze([

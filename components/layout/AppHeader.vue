@@ -37,7 +37,7 @@
 
         <!-- Action Items -->
         <div class="ta-header__actions">
-          <NuxtLink to="/products" class="ta-header__action-btn" aria-label="Search Collection">
+          <NuxtLink to="/" class="ta-header__action-btn" aria-label="Search Collection">
             <v-icon icon="mdi-magnify" size="22" />
           </NuxtLink>
 

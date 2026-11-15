@@ -1,8 +1,8 @@
 <template>
   <div class="ta-bag">
-    <p v-if="!items.length" class="ta-bag__empty">Your bag is empty. Add a dress to check out.</p>
+    <p v-if="!placed && !items.length" class="ta-bag__empty">Your bag is empty. Add a dress to check out.</p>
 
-    <ul v-else class="ta-bag__list">
+    <ul v-else-if="items.length" class="ta-bag__list">
       <li v-for="item in items" :key="itemKey(item)">
         <img v-if="item.image" :src="item.image" :alt="item.name">
         <div>
@@ -22,40 +22,47 @@
       </li>
     </ul>
 
-    <template v-if="items.length">
+    <template v-if="placed">
+      <div class="ta-bag__placed">
+        <h3>Order placed</h3>
+        <p>
+          Your order is placed. We will get back to you when Thash Attire confirms the order.
+          Please pay the amount then, and you will receive your order confirmation.
+        </p>
+        <p v-if="placed.number" class="ta-bag__ref">Reference {{ placed.number }}</p>
+        <a class="ta-bag__wa" :href="placedWhatsapp" target="_blank" rel="noopener">Connect on WhatsApp</a>
+      </div>
+    </template>
+
+    <template v-else-if="items.length">
       <p class="ta-bag__total"><span>Total</span><strong>{{ formatCurrency(subtotal) }}</strong></p>
 
-      <a v-if="!catalogCheckout" class="ta-bag__signin" :href="customOrderLink" target="_blank" rel="noopener">
-        Order now
-      </a>
-      <NuxtLink v-else-if="!isAuthenticated" :to="{ path: '/login', query: { redirect: '/?panel=bag' } }" class="ta-bag__signin">
-        Sign in to checkout
-      </NuxtLink>
+      <label class="ta-bag__note">
+        <span>Size details & notes</span>
+        <textarea
+          v-model="note"
+          rows="4"
+          maxlength="500"
+          placeholder="Bust, waist, hip, height, or any fit notes"
+        />
+      </label>
 
-      <v-form v-else ref="formRef" class="ta-bag__form" @submit.prevent="placeOrder">
-        <CommonAppTextField v-model="name" label="Full name" :rules="[requiredRule()]" />
+      <v-form v-if="step === 'phone'" ref="phoneForm" class="ta-bag__form" @submit.prevent="continuePhone">
+        <p class="ta-bag__lead">Enter your mobile number to place this order.</p>
         <CommonAppTextField
-          v-if="needsPhone"
           v-model="phone"
           label="Mobile number"
           placeholder="10-digit mobile"
           :rules="[requiredRule(), phoneRule()]"
         />
-        <p v-else class="ta-bag__phone">Mobile · {{ formatPhone(profile?.phone) }}</p>
-        <v-textarea
-          v-model="address"
-          label="Delivery address"
-          variant="outlined"
-          rows="3"
-          auto-grow
-          :rules="[addressRule]"
-        />
-        <div class="ta-bag__pay">
-          <button type="button" :class="{ 'is-on': paymentMethod === 'upi' }" @click="paymentMethod = 'upi'">UPI</button>
-          <button type="button" :class="{ 'is-on': paymentMethod === 'cash' }" @click="paymentMethod = 'cash'">Cash on delivery</button>
-        </div>
-        <CommonAppButton premium block type="submit" :loading="placing">Place order</CommonAppButton>
+        <CommonAppButton premium block type="submit">Continue</CommonAppButton>
       </v-form>
+
+      <div v-else class="ta-bag__confirm">
+        <p class="ta-bag__phone">Mobile · {{ formatPhone(cleanPhone(phone)) }}</p>
+        <button type="button" class="ta-bag__change" @click="step = 'phone'">Change number</button>
+        <CommonAppButton premium block :loading="placing" @click="confirmOrder">Confirm order</CommonAppButton>
+      </div>
     </template>
   </div>
 </template>
@@ -68,62 +75,84 @@ import { CustomerOrderService } from '~/services/CustomerOrderService.js'
 
 const config = useRuntimeConfig()
 const { items, subtotal, itemKey, setQuantity, removeItem, clear } = useCart()
-const { isAuthenticated, profile, refreshProfile } = useCustomerAuth()
-const { closeBag } = useBagDrawer()
-const { success, error: showError } = useSnackbar()
+const { isAuthenticated, profile } = useCustomerAuth()
+const { error: showError } = useSnackbar()
 
-const formRef = ref(null)
+const phoneForm = ref(null)
 const placing = ref(false)
-const name = ref('')
+const step = ref('phone')
 const phone = ref('')
-const address = ref('')
-const paymentMethod = ref('upi')
+const note = ref('')
+const placed = ref(null)
 
-const needsPhone = computed(() => !profile.value?.phone)
-
-const catalogCheckout = computed(() => items.value.every(item => (
+const catalogCheckout = computed(() => items.value.length > 0 && items.value.every(item => (
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(item.productId || ''))
 )))
 
-const customOrderLink = computed(() => {
-  const lines = items.value.map(item => `${item.name} × ${item.quantity} · ${formatCurrency(item.price * item.quantity)}`)
-  return getWhatsAppLink(config.public.whatsappNumber, `Hi Thash Attire, I’d like to order:\n${lines.join('\n')}`)
+const placedWhatsapp = computed(() => {
+  if (!placed.value) return '#'
+  const noteLine = placed.value.note ? ` Notes: ${placed.value.note}` : ''
+  const message = `Hi Thash Attire, I placed order ${placed.value.number}. My mobile is ${placed.value.phone}.${noteLine}`
+  return getWhatsAppLink(config.public.whatsappNumber, message)
 })
 
 watch(profile, (value) => {
-  if (!value) return
-  if (!name.value) name.value = value.name || ''
-  if (!address.value) address.value = value.address || ''
+  if (value?.phone && !phone.value) phone.value = value.phone
 }, { immediate: true })
 
-function addressRule(value) {
-  if (!value || value.trim().length < 8) return 'Enter a complete delivery address'
-  return true
+async function continuePhone() {
+  const { valid } = await phoneForm.value.validate()
+  if (!valid) return
+  step.value = 'confirm'
 }
 
-async function placeOrder() {
-  const { valid } = await formRef.value.validate()
-  if (!valid || !items.value.length) return
+async function confirmOrder() {
+  const mobile = cleanPhone(phone.value)
+  if (!mobile) {
+    step.value = 'phone'
+    return
+  }
 
   placing.value = true
+  const customerNote = note.value.trim()
+  const notes = customerNote
+    ? `${customerNote}\n\nConfirm with the customer, then collect payment.`
+    : 'Confirm with the customer, then collect payment.'
+  let number = `TA${Date.now().toString().slice(-8)}`
   try {
-    const order = await CustomerOrderService.placeOrder({
-      items: items.value.map(item => ({
-        product_id: item.productId,
-        quantity: item.quantity,
-        size: item.size,
-        color: item.color,
-      })),
-      shippingAddress: address.value.trim(),
-      paymentMethod: paymentMethod.value,
-      name: name.value.trim(),
-      phone: needsPhone.value ? cleanPhone(phone.value) : null,
-      notes: '',
-    })
+    if (catalogCheckout.value && isAuthenticated.value) {
+      const order = await CustomerOrderService.placeOrder({
+        items: items.value.map(item => ({
+          product_id: item.productId,
+          quantity: item.quantity,
+          size: item.size,
+          color: item.color,
+        })),
+        shippingAddress: profile.value?.address?.trim()?.length >= 8
+          ? profile.value.address.trim()
+          : 'To be confirmed with you',
+        paymentMethod: 'upi',
+        name: profile.value?.name || 'Customer',
+        phone: mobile,
+        notes,
+      })
+      number = order?.order_number || number
+    } else {
+      const saved = JSON.parse(localStorage.getItem('thash-attire-orders') || '[]')
+      saved.unshift({
+        number,
+        phone: mobile,
+        note: customerNote,
+        total: subtotal.value,
+        items: items.value.map(item => ({ name: item.name, quantity: item.quantity, price: item.price })),
+        placedAt: new Date().toISOString(),
+      })
+      localStorage.setItem('thash-attire-orders', JSON.stringify(saved.slice(0, 20)))
+    }
     clear()
-    await refreshProfile()
-    closeBag()
-    success(`Order ${order.order_number} is placed`)
+    placed.value = { number, phone: mobile, note: customerNote }
+    note.value = ''
+    step.value = 'phone'
   } catch (err) {
     showError(err.message)
   } finally {
@@ -135,8 +164,59 @@ async function placeOrder() {
 <style scoped lang="scss">
 .ta-bag {
   &__empty,
-  &__phone {
+  &__phone,
+  &__lead,
+  &__ref {
     color: var(--color-text-secondary);
+  }
+
+  &__lead {
+    margin-bottom: var(--spacing-md);
+  }
+
+  &__confirm {
+    display: grid;
+    gap: var(--spacing-sm);
+  }
+
+  &__change {
+    @include button-reset;
+    justify-self: start;
+    color: var(--color-accent);
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-bottom: var(--spacing-sm);
+  }
+
+  &__placed {
+    display: grid;
+    gap: var(--spacing-md);
+
+    h3 {
+      font-family: var(--font-heading);
+      font-size: 2rem;
+      font-weight: 500;
+      margin: 0;
+    }
+
+    p {
+      margin: 0;
+      line-height: 1.6;
+    }
+  }
+
+  &__wa {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 48px;
+    background: #1fa971;
+    color: #fff;
+    text-decoration: none;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    font-weight: 600;
   }
 
   &__list {
@@ -196,36 +276,32 @@ async function placeOrder() {
     font-size: 1.6rem;
   }
 
-  &__signin {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 48px;
-    background: var(--color-primary);
-    color: var(--color-text-inverse);
-    text-decoration: none;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    font-size: 0.78rem;
-    font-weight: 600;
-  }
-
-  &__pay {
-    display: flex;
-    gap: var(--spacing-sm);
+  &__note {
+    display: grid;
+    gap: 6px;
     margin-bottom: var(--spacing-md);
 
-    button {
-      @include button-reset;
-      flex: 1;
-      height: 44px;
-      border: 1px solid var(--color-border);
-      background: var(--color-surface);
+    span {
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
 
-      &.is-on {
-        background: var(--color-primary);
-        color: var(--color-text-inverse);
-        border-color: var(--color-primary);
+    textarea {
+      width: 100%;
+      min-height: 96px;
+      resize: vertical;
+      padding: 12px 14px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-surface);
+      color: var(--color-text);
+      font: inherit;
+      line-height: 1.5;
+
+      &:focus {
+        outline: 1px solid var(--color-accent);
+        border-color: var(--color-accent);
       }
     }
   }
