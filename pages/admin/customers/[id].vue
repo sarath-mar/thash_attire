@@ -5,7 +5,7 @@
     <template v-else-if="customer">
       <AdminPageHeader
         :title="customer.name"
-        :subtitle="customer.phone"
+        :subtitle="customer.phone || customer.email || ''"
       />
 
       <div class="ta-admin-customer-detail__layout">
@@ -15,7 +15,11 @@
             <h3 class="text-subtitle-1 font-weight-semibold mb-3">Customer Information</h3>
             <div class="mb-3">
               <span class="text-caption text-medium-emphasis d-block">Phone Number</span>
-              <span>{{ customer.phone }}</span>
+              <span>{{ customer.phone || '—' }}</span>
+            </div>
+            <div class="mb-3">
+              <span class="text-caption text-medium-emphasis d-block">Email</span>
+              <span>{{ customer.email || '—' }}</span>
             </div>
             <div class="mb-3">
               <span class="text-caption text-medium-emphasis d-block">Address</span>

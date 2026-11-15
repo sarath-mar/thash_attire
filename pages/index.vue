@@ -1,5 +1,5 @@
 <template>
-  <div class="ed" @keydown.esc="closeAlbum">
+  <div class="ed" @keydown.esc="onEscape">
     <svg ref="trailSvg" class="ed-trail" aria-hidden="true">
       <path ref="trailPath" />
     </svg>
@@ -9,7 +9,19 @@
         <div class="ed-brand">
           <a class="ed-logo" href="#top" @click.prevent="scrollTo('top')">Thash Attire</a>
           <p class="ed-tag">made for one person only</p>
-          <a class="ed-start" href="#contact" @click.prevent="scrollTo('contact')">{ Start your dress }</a>
+          <div class="ed-icons">
+            <button type="button" class="ed-icon ed-tip" data-tip="Orders" aria-label="Orders" @click="openPanel('orders')">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="3.5" width="12" height="17" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9 3.5h6V6H9zM9 11h6M9 14.5h4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            </button>
+            <button type="button" class="ed-icon ed-tip" data-tip="Cart" aria-label="Cart" @click="openPanel('bag')">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8h12l-1 12H7L6 8z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9 8V6a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+              <span v-if="cartCount" class="ed-icon__count">{{ cartCount }}</span>
+            </button>
+            <button type="button" class="ed-icon ed-tip" data-tip="Profile" aria-label="Profile" @click="openPanel('profile')">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 19c1.4-3 3.8-4.5 7-4.5S17.6 16 19 19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+          <a class="ed-start" href="#contact" @click.prevent="scrollTo('contact')">Start your dress</a>
         </div>
         <nav class="ed-nav" aria-label="Page">
           <a
@@ -51,41 +63,59 @@
         <section id="top" class="ed-sec ed-hero">
           <div class="ed-hero-grid">
             <div class="ed-hero-copy">
-              <span class="ed-lab ed-rv">made for one person only ↘</span>
-              <h1 class="ed-rv">Your dress,<br>cut &amp; stitched<br>for <em>you.</em></h1>
-              <p class="ed-rv">No bulk. No stock sizes. Every Thash dress is made after your measurements, one at a time.</p>
+              <span class="ed-lab ed-rv">new season ↘</span>
+              <h1 class="ed-rv">Dresses,<br>cut for <em>you.</em></h1>
               <div class="ed-rv">
-                <a class="ed-btn ed-btn--rose" href="#contact" @click.prevent="scrollTo('contact')">{ Start your dress }</a>
-                <a class="ed-btn" href="#work" @click.prevent="scrollTo('work')">See the collection</a>
+                <a class="ed-btn ed-btn--rose" href="#contact" @click.prevent="scrollTo('contact')">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  Start your dress
+                </a>
+                <button type="button" class="ed-btn" @click="scrollTo('work')">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="13" y="4" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="4" y="13" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="13" y="13" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+                  Collections
+                </button>
               </div>
               <p class="ed-love ed-rv">Made with love. Delivered to your doorstep.</p>
             </div>
             <div class="ed-panel ed-rv">
               <div class="ed-photo-wrap">
-                <img class="ed-photo" :src="heroPhoto" alt="Thash Attire dress, cut to measure">
-                <span class="ed-photo-tag">{{ dressTag }}</span>
+                <img class="ed-photo" :src="heroPhoto" alt="Thash Attire dress">
+                <span class="ed-photo-tag">Yours</span>
               </div>
               <div class="ed-script">made for you, with love</div>
-              <div class="ed-pills">
-                <span>1. Measure</span>
-                <span>2. Cut</span>
-                <span>3. Stitch</span>
-                <span>4. Deliver</span>
-              </div>
             </div>
           </div>
         </section>
 
-        <section id="how" class="ed-sec">
-          <span class="ed-lab ed-rv">how it works</span>
-          <h2 class="ed-rv">From your measurements<br>to your doorstep.</h2>
-          <div class="ed-steps">
-            <article v-for="step in steps" :key="step.n" class="ed-step ed-rv">
-              <b>{{ step.n }}</b>
-              <h3>{{ step.title }}</h3>
-              <p>{{ step.text }}</p>
+        <section id="look" class="ed-sec">
+          <div class="ed-lookbook">
+            <article v-for="look in lookbook" :key="look.key" class="ed-look ed-rv">
+              <button type="button" class="ed-look__open" @click="openProduct(look)">
+                <img :src="look.image" :alt="look.name">
+              </button>
+              <figcaption>
+                <div>
+                  <strong>{{ look.name }}</strong>
+                  <span>{{ formatCurrency(look.price) }}</span>
+                </div>
+                <div class="ed-look__actions">
+                  <button
+                    type="button"
+                    class="ed-tip"
+                    :data-tip="addedKey === look.key ? 'Added' : 'Add to cart'"
+                    aria-label="Add to cart"
+                    @click="addLook(look)"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8h12l-1 12H7L6 8z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9 8V6a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+                  </button>
+                  <button type="button" class="ed-tip" data-tip="Order now" aria-label="Order now" @click="buyLook(look)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </button>
+                </div>
+              </figcaption>
             </article>
           </div>
+          <button type="button" class="ed-btn" @click="openAllProducts">See more</button>
         </section>
 
         <section id="work" class="ed-sec">
@@ -103,75 +133,50 @@
                 <img :src="collection.image" :alt="collection.title">
               </div>
               <h3>{{ collection.title }}</h3>
-              <small>{{ collection.looks.length }} designs</small>
+              <small>{{ collection.items.length }} products</small>
             </button>
-          </div>
-        </section>
-
-        <section id="why" class="ed-sec">
-          <span class="ed-lab ed-rv">why made-to-measure</span>
-          <h2 class="ed-rv">Problems ready-made<br>can’t solve.</h2>
-          <div class="ed-why">
-            <article
-              v-for="card in whyCards"
-              :key="card.title"
-              class="ed-why__card ed-rv"
-              :style="{ background: card.background }"
-            >
-              <h3>{{ card.title }}</h3>
-              <p>{{ card.text }}</p>
-            </article>
-          </div>
-        </section>
-
-        <section id="pricing" class="ed-sec">
-          <div class="ed-price ed-rv">
-            <span class="ed-lab">simple pricing</span>
-            <h2>From<br>{{ priceLabel }}</h2>
-            <small>per dress, made to order</small>
-            <ul>
-              <li>Stitched to your measurements</li>
-              <li>Choose your fabric and colour</li>
-              <li>One-to-one help with measuring</li>
-              <li>Fitting notes confirmed before we cut</li>
-            </ul>
-            <a class="ed-btn ed-btn--rose" href="#contact" @click.prevent="scrollTo('contact')">{ Start your dress }</a>
           </div>
         </section>
 
         <section id="reviews" class="ed-sec">
           <span class="ed-lab ed-rv">reviews</span>
-          <h2 class="ed-rv">{{ reviews[reviewIndex].quote }}</h2>
-          <b class="ed-rv">{{ reviews[reviewIndex].name }}</b>
-          <div class="ed-review-nav ed-rv">
-            <small>{{ reviewIndex + 1 }} of {{ reviews.length }}</small>
-            <button type="button" class="ed-arrow" aria-label="Previous review" @click="stepReview(-1)">←</button>
-            <button type="button" class="ed-arrow" aria-label="Next review" @click="stepReview(1)">→</button>
+          <div class="ed-reviews">
+            <article
+              v-for="review in reviews"
+              :key="review.name"
+              class="ed-review ed-rv"
+              :style="{ background: review.background }"
+            >
+              <h3>{{ review.quote }}</h3>
+              <p>{{ review.name }}</p>
+            </article>
           </div>
-        </section>
-
-        <section id="faq" class="ed-sec">
-          <span class="ed-lab ed-rv">questions</span>
-          <h2 class="ed-rv">Good to know.</h2>
-          <details v-for="(item, index) in faqs" :key="item.q" class="ed-rv" :open="index === 0">
-            <summary>{{ item.q }}</summary>
-            <p>{{ item.a }}</p>
-          </details>
         </section>
 
         <section id="contact" class="ed-sec">
           <div class="ed-contact ed-rv">
             <span class="ed-lab">get in touch</span>
             <h2>Ready to be measured?</h2>
-            <a class="ed-btn ed-btn--wa" :href="whatsappLink" target="_blank" rel="noopener">{ WhatsApp }</a>
-            <a class="ed-btn ed-btn--ivory" :href="instagramUrl" target="_blank" rel="noopener">{ Instagram }</a>
-            <a class="ed-btn ed-btn--rose" href="mailto:hello@thashattire.com">{ Email }</a>
+            <a class="ed-btn ed-btn--wa" :href="whatsappLink" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18l1.2-3.4A7 7 0 1 1 12 19a7 7 0 0 1-3.2-.8L6 18z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+              WhatsApp
+            </a>
+            <a class="ed-btn ed-btn--ivory" :href="instagramUrl" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="4" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="16.2" cy="7.8" r="0.8" fill="currentColor"/></svg>
+              Instagram
+            </a>
+            <a class="ed-btn ed-btn--rose" href="mailto:hello@thashattire.com">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="6" width="16" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 7l7 6 7-6" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+              Email
+            </a>
           </div>
           <footer class="ed-foot ed-rv">
             <span class="ed-logo">Thash Attire</span>
             <span class="ed-script ed-script--ink">Made with love, mom’s care</span>
             <span class="ed-foot__links">
-              <NuxtLink to="/products">Shop</NuxtLink>
+              <button type="button" @click="openPanel('orders')">Orders</button>
+              <button type="button" @click="openPanel('profile')">Profile</button>
+              <button type="button" @click="openPanel('bag')">Bag</button>
               <NuxtLink to="/about">About</NuxtLink>
               <NuxtLink to="/contact">Contact</NuxtLink>
             </span>
@@ -182,46 +187,79 @@
       </main>
 
       <div class="ed-album" :class="{ 'is-open': albumOpen }">
-        <button type="button" class="ed-back" @click="closeAlbum">← All collections</button>
-        <div v-if="activeCollection" class="ed-album__body">
-          <div>
+        <button v-if="albumMode === 'product'" type="button" class="ed-back" @click="albumMode = albumFrom">
+          ← {{ albumFrom === 'all' ? 'All products' : activeCollection?.title }}
+        </button>
+        <button v-else type="button" class="ed-back" @click="closeAlbum">← Home</button>
+
+        <div v-if="albumMode === 'all'" class="ed-catalog">
+          <span class="ed-lab">the edit</span>
+          <h2>All products</h2>
+          <div class="ed-product-grid">
+            <button
+              v-for="item in allProducts"
+              :key="item.key"
+              type="button"
+              class="ed-product"
+              @click="openProduct(item, 'all')"
+            >
+              <img :src="item.image" :alt="item.name">
+              <strong>{{ item.name }}</strong>
+              <span>{{ formatCurrency(item.price) }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div v-else-if="albumMode === 'collection' && activeCollection" class="ed-catalog">
+          <span class="ed-lab">collection</span>
+          <h2>{{ activeCollection.title }}</h2>
+          <p class="ed-album__copy">{{ activeCollection.description }}</p>
+          <div class="ed-product-grid">
+            <button
+              v-for="item in activeCollection.items"
+              :key="item.key"
+              type="button"
+              class="ed-product"
+              @click="openProduct(item, 'collection')"
+            >
+              <img :src="item.image" :alt="item.name">
+              <strong>{{ item.name }}</strong>
+              <span>{{ formatCurrency(item.price) }} · {{ item.images.length }} photos</span>
+            </button>
+          </div>
+        </div>
+
+        <div v-else-if="activeLookItem" class="ed-album__body">
+          <div class="ed-stage">
+            <button type="button" class="ed-arrow" aria-label="Previous image" @click="stepImage(-1)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+            </button>
             <div class="ed-big" :style="{ background: lookPalette[1] }">
               <img :src="activeLookImage" :alt="activeLook">
             </div>
-            <div class="ed-album__controls">
-              <button type="button" class="ed-arrow" aria-label="Previous design" @click="stepLook(-1)">←</button>
-              <button type="button" class="ed-arrow" aria-label="Next design" @click="stepLook(1)">→</button>
-              <small>{{ activeLook }} · {{ lookIndex + 1 }} of {{ activeCollection.looks.length }}</small>
-            </div>
-            <div class="ed-thumbs">
-              <button
-                v-for="(look, index) in activeCollection.looks"
-                :key="look"
-                type="button"
-                :class="{ 'is-on': index === lookIndex }"
-                :style="{ background: palettes[(index + collectionIndex) % palettes.length][1] }"
-                :aria-label="look"
-                @click="lookIndex = index"
-              >
-                <img :src="lookImage(index)" :alt="look">
-              </button>
-            </div>
+            <button type="button" class="ed-arrow" aria-label="Next image" @click="stepImage(1)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+            </button>
           </div>
           <div>
-            <span class="ed-lab">collection</span>
-            <h2>{{ activeCollection.title }}</h2>
+            <span class="ed-lab">{{ activeCollection.title }}</span>
+            <h2>{{ activeLook }}</h2>
+            <p class="ed-album__price">{{ formatCurrency(activeLookItem.price) }}</p>
             <p class="ed-album__copy">{{ activeCollection.description }}</p>
-            <dl class="ed-facts">
-              <dt>Fabrics</dt>
-              <dd>{{ activeCollection.fabrics }}</dd>
-              <dt>Fit</dt>
-              <dd>Made to your measurements</dd>
-              <dt>Ready in</dt>
-              <dd>Confirmed on WhatsApp before we cut</dd>
-              <dt>Starting at</dt>
-              <dd>{{ priceLabel }}</dd>
-            </dl>
-            <a class="ed-btn ed-btn--rose" :href="orderLink" target="_blank" rel="noopener">{ Order this style }</a>
+            <button type="button" class="ed-btn" @click="addLook(activeLookItem)">Add to cart</button>
+            <button type="button" class="ed-btn ed-btn--rose" @click="buyLook(activeLookItem)">Buy now</button>
+            <div class="ed-thumbs">
+              <button
+                v-for="(src, index) in activeLookImages"
+                :key="`${activeLook}-${index}`"
+                type="button"
+                :class="{ 'is-on': index === imageIndex }"
+                :aria-label="`${activeLook} photo ${index + 1}`"
+                @click="imageIndex = index"
+              >
+                <img :src="src" :alt="activeLook">
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -237,15 +275,87 @@
         </a>
         <button type="button" aria-label="Close" @click="showWhatsappTab = false">×</button>
       </div>
+
+      <div v-if="!panel && !albumOpen" class="ed-search">
+        <input
+          v-model="searchQuery"
+          type="search"
+          placeholder="Search a dress"
+          aria-label="Search a dress"
+          @focus="searchOpen = true"
+          @input="searchOpen = true"
+        >
+        <ul v-if="searchOpen && searchQuery.trim()" class="ed-search__list">
+          <li v-if="!searchResults.length">No dresses match that.</li>
+          <li v-for="item in searchResults" :key="item.key">
+            <button type="button" @click="chooseSearch(item)">
+              <img :src="item.image" :alt="item.name">
+              <span>{{ item.label || item.name }}</span>
+              <b>{{ formatCurrency(item.price) }}</b>
+            </button>
+          </li>
+        </ul>
+      </div>
+
+      <div v-if="panel" class="ed-drawer">
+        <button type="button" class="ed-drawer__scrim" aria-label="Close panel" @click="closePanel" />
+        <aside class="ed-drawer__sheet" role="dialog" :aria-label="panelTitle">
+          <header class="ed-drawer__head">
+            <h2>{{ panelTitle }}</h2>
+            <button type="button" aria-label="Close" @click="closePanel">×</button>
+          </header>
+
+          <div v-if="panel === 'orders'" class="ed-orders">
+            <template v-if="!isAuthenticated">
+              <p>Sign in to see current and past orders.</p>
+              <NuxtLink class="ed-btn ed-btn--rose" :to="{ path: '/login', query: { redirect: '/?panel=orders' } }">Sign in</NuxtLink>
+            </template>
+            <template v-else-if="ordersLoading">
+              <p class="ed-drawer__note">Loading your orders…</p>
+            </template>
+            <template v-else>
+              <p v-if="ordersError" class="ed-drawer__note">{{ ordersError }}</p>
+              <h3>Current</h3>
+              <p v-if="!currentOrders.length" class="ed-drawer__note">No orders in progress.</p>
+              <ul v-else>
+                <li v-for="order in currentOrders" :key="order.id">
+                  <span>{{ order.order_number }}</span>
+                  <span>{{ orderLabel(order) }}</span>
+                  <b>{{ orderStatusLabel(order.status) }}</b>
+                  <strong>{{ formatCurrency(order.final_amount) }}</strong>
+                </li>
+              </ul>
+              <h3>Past</h3>
+              <p v-if="!pastOrders.length" class="ed-drawer__note">No past orders yet.</p>
+              <ul v-else>
+                <li v-for="order in pastOrders" :key="order.id">
+                  <span>{{ order.order_number }}</span>
+                  <span>{{ orderLabel(order) }}</span>
+                  <b>{{ orderStatusLabel(order.status) }}</b>
+                  <strong>{{ formatCurrency(order.final_amount) }}</strong>
+                </li>
+              </ul>
+            </template>
+          </div>
+
+          <CustomerHomeAccount v-else-if="panel === 'profile'" />
+          <CustomerCheckout v-else-if="panel === 'bag'" />
+        </aside>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
 import { PageTitles } from '~/constants/pageTitles.js'
+import { DefaultImages } from '~/constants/defaults.js'
 import { getWhatsAppLink } from '~/helpers/phone.js'
 import { formatCurrency } from '~/helpers/currency.js'
 import { ProductService } from '~/services/ProductService.js'
+import { StorageService } from '~/services/StorageService.js'
+import { StorageBucket } from '~/enums/storageBucket.js'
+import { CustomerOrderService } from '~/services/CustomerOrderService.js'
+import { OrderStatusLabels } from '~/enums/orderStatus.js'
 
 definePageMeta({ layout: 'blank' })
 
@@ -269,9 +379,25 @@ const gallery = [
   'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=1000&q=80',
   'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?auto=format&fit=crop&w=1000&q=80',
   'https://images.unsplash.com/photo-1566174053879-31528523f8ae?auto=format&fit=crop&w=1000&q=80',
+  'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=1000&q=80',
+  'https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1000&q=80',
+  'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=1000&q=80',
+  'https://images.unsplash.com/photo-1469334031218-e382a71b716b?auto=format&fit=crop&w=1000&q=80',
+  'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1000&q=80',
+  'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=1000&q=80',
+  'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=1000&q=80',
+  'https://images.unsplash.com/photo-1550614000-4895a10e1bfd?auto=format&fit=crop&w=1000&q=80',
+  'https://images.unsplash.com/photo-1581044777550-4cfa60707c03?auto=format&fit=crop&w=1000&q=80',
+  'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?auto=format&fit=crop&w=1000&q=80',
+  'https://images.unsplash.com/photo-1617019114583-affb34d1b3cd?auto=format&fit=crop&w=1000&q=80',
+  'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?auto=format&fit=crop&w=1000&q=80',
 ]
 
 const heroPhoto = gallery[2]
+
+function lookPhotos(seed) {
+  return [0, 1, 2].map(step => gallery[(seed + step * 7) % gallery.length])
+}
 
 const palettes = [
   ['#d9707a', '#f5d5d3'],
@@ -319,53 +445,64 @@ const collections = [
     looks: ['Frock', 'Party Frock', 'Ethnic Set', 'Lehenga Choli', 'Casual Dress', 'Twinning Set'],
     fabrics: 'Soft cotton, muslin, silk',
   },
-].map((collection, index) => ({
-  ...collection,
-  palette: palettes[index % palettes.length],
-  image: gallery[index % gallery.length],
-  lookImages: collection.looks.map((_, look) => gallery[(index + look) % gallery.length]),
-}))
+].map((collection, index) => {
+  const items = collection.looks.map((name, look) => {
+    const seed = index * 6 + look
+    const images = lookPhotos(seed)
+    return {
+      key: `${index}-${look}`,
+      name,
+      price: 1890 + (seed % 7) * 350,
+      images,
+      image: images[0],
+      collectionIndex: index,
+      lookIndex: look,
+      label: `${name} · ${collection.title}`,
+    }
+  })
+  return {
+    ...collection,
+    palette: palettes[index % palettes.length],
+    image: items[0].image,
+    items,
+    lookImages: items.map(item => item.image),
+  }
+})
+
+const lookbook = collections.slice(0, 3).map(collection => collection.items[0])
+const allProducts = collections.flatMap(collection => collection.items)
+
+const route = useRoute()
+const { isAuthenticated } = useCustomerAuth()
+const { count, addItem } = useCart()
+const cartCount = computed(() => count.value)
 
 const navItems = [
-  { id: 'how', label: 'How it works' },
+  { id: 'look', label: 'Lookbook' },
   { id: 'work', label: 'Collections' },
-  { id: 'why', label: 'Why made-to-measure' },
-  { id: 'pricing', label: 'Pricing' },
   { id: 'reviews', label: 'Reviews' },
-  { id: 'faq', label: 'FAQ' },
-]
-
-const steps = [
-  { n: '1', title: 'Share your measurements', text: 'Send them on WhatsApp or use our form. We’ll guide you step by step.' },
-  { n: '2', title: 'We cut your fabric', text: 'Your pieces are cut to your numbers, in the fabric and colour you choose.' },
-  { n: '3', title: 'We stitch it', text: 'Every seam is stitched with care, and checked against your measurements.' },
-  { n: '4', title: 'It reaches you', text: 'Delivered to your door. If the fit needs a small note, message us and we’ll help.' },
-]
-
-const whyCards = [
-  { title: '“It never fits right.”', text: 'Tight at the hip, loose at the waist. Ours is cut to your numbers, so it sits where it should.', background: '#f5d5d3' },
-  { title: '“Everyone has the same one.”', text: 'Because we don’t make in bulk, your dress is made for you alone: your fabric, your colour, your details.', background: '#f4e3b8' },
-  { title: '“My size is always sold out.”', text: 'There is no stock to sell out. Every dress starts when you order, in your size.', background: '#d9e8e0' },
 ]
 
 const reviews = [
-  { quote: '“The kurta dress sat exactly where I asked — waist, hip, and length. It feels made, not picked off a rail.”', name: 'Ananya R., Kochi' },
-  { quote: '“I sent measurements on WhatsApp and they walked me through each one. The co-ord arrived ready to wear.”', name: 'Priya Sharma, Bengaluru' },
-  { quote: '“No one else at the wedding had this colour, because it was cut for me. That is the whole point.”', name: 'Meera V., Thrissur' },
+  { quote: '“The kurta dress sat exactly where I asked — waist, hip, and length.”', name: 'Ananya R., Kochi', background: '#f5d5d3' },
+  { quote: '“I sent measurements on WhatsApp. The co-ord arrived ready to wear.”', name: 'Priya Sharma, Bengaluru', background: '#f4e3b8' },
+  { quote: '“No one else at the wedding had this colour, because it was cut for me.”', name: 'Meera V., Thrissur', background: '#d9e8e0' },
 ]
 
-const faqs = [
-  { q: 'How does made-to-measure work?', a: 'You pick a design, send your measurements (we help you measure), and we cut and stitch the dress for you.' },
-  { q: 'How long does it take?', a: 'Timing depends on the design and fabric. We confirm a date on WhatsApp before we cut.' },
-  { q: 'Can I change the design or fabric?', a: 'Yes, before we cut. Tell us the fabric, colour, and the details you want changed.' },
-  { q: 'Do you deliver across India?', a: 'Yes. We stitch to order and deliver to your doorstep.' },
-]
-
-const startingPrice = ref(null)
-const reviewIndex = ref(0)
 const albumOpen = ref(false)
+const albumMode = ref('collection')
+const albumFrom = ref('collection')
+const panel = ref('')
+const shopProducts = ref([])
+const orders = ref([])
+const ordersError = ref('')
+const ordersLoading = ref(false)
 const collectionIndex = ref(0)
 const lookIndex = ref(0)
+const imageIndex = ref(0)
+const addedKey = ref('')
+const searchQuery = ref('')
+const searchOpen = ref(false)
 const activeSection = ref('how')
 const showWhatsappTab = ref(true)
 
@@ -388,34 +525,138 @@ const whatsappLink = computed(() =>
 
 const instagramUrl = computed(() => config.public.instagramUrl || 'https://instagram.com/thashattire')
 
-const priceLabel = computed(() => (
-  startingPrice.value ? formatCurrency(startingPrice.value) : 'Made to order'
-))
-
-const dressTag = computed(() => (
-  startingPrice.value ? formatCurrency(startingPrice.value) : 'Yours'
-))
+const panelTitle = computed(() => {
+  if (panel.value === 'orders') return 'Orders'
+  if (panel.value === 'bag') return 'Cart'
+  return 'Your details'
+})
 
 const activeCollection = computed(() => collections[collectionIndex.value] || null)
 
-const activeLook = computed(() => activeCollection.value?.looks[lookIndex.value] || '')
+const activeLookItem = computed(() => activeCollection.value?.items?.[lookIndex.value] || null)
 
-const lookImage = (index) => activeCollection.value?.lookImages?.[index] || gallery[0]
+const activeLook = computed(() => activeLookItem.value?.name || '')
 
-const activeLookImage = computed(() => lookImage(lookIndex.value))
+const activeLookImages = computed(() => activeLookItem.value?.images || [])
+
+const activeLookImage = computed(() => activeLookImages.value[imageIndex.value] || activeLookItem.value?.image || gallery[0])
 
 const lookPalette = computed(() => palettes[(lookIndex.value + collectionIndex.value) % palettes.length])
 
-const orderLink = computed(() => {
-  const collection = activeCollection.value
-  if (!collection) return whatsappLink.value
-  return getWhatsAppLink(
-    config.public.whatsappNumber,
-    `Hi Thash Attire, I’d like to order a ${activeLook.value} from ${collection.title}.`,
-  )
+const pastStatuses = new Set(['delivered', 'completed', 'cancelled'])
+
+const currentOrders = computed(() => orders.value.filter(order => !pastStatuses.has(order.status)))
+
+const pastOrders = computed(() => orders.value.filter(order => pastStatuses.has(order.status)))
+
+const searchResults = computed(() => {
+  const query = searchQuery.value.trim().toLowerCase()
+  if (!query) return []
+  const editorial = collections.flatMap(collection => collection.items)
+  const remote = shopProducts.value.map(product => ({
+    key: product.id,
+    name: product.name,
+    label: product.name,
+    price: Number(product.selling_price) || 0,
+    image: productImage(product),
+    href: `/products/${product.id}`,
+  }))
+  return [...remote, ...editorial]
+    .filter(item => `${item.name} ${item.label || ''}`.toLowerCase().includes(query))
+    .slice(0, 6)
 })
 
-const pageIds = ['top', 'how', 'work', 'why', 'pricing', 'reviews', 'faq', 'contact']
+const pageIds = ['top', 'look', 'work', 'reviews', 'contact']
+
+const productImage = (product) => {
+  const img = product?.images?.[0]
+  if (!img) return DefaultImages.PRODUCT
+  if (String(img).startsWith('http')) return img
+  return StorageService.getPublicUrl(StorageBucket.PRODUCTS, img) || DefaultImages.PRODUCT
+}
+
+const openPanel = (name) => {
+  searchOpen.value = false
+  panel.value = name
+  if (name === 'orders') loadOrders()
+}
+
+const closePanel = () => {
+  panel.value = ''
+}
+
+function cartPayload(item) {
+  if (!item) return null
+  return {
+    productId: item.productId || item.key,
+    name: item.name,
+    price: Number(item.price) || 0,
+    image: item.image || item.images?.[0] || '',
+    size: '',
+    color: '',
+    quantity: 1,
+    sku: item.sku || '',
+  }
+}
+
+function addLook(item) {
+  const payload = cartPayload(item)
+  if (!payload) return
+  addItem(payload)
+  addedKey.value = item.key
+}
+
+function buyLook(item) {
+  const payload = cartPayload(item)
+  if (!payload) return
+  addItem(payload)
+  searchOpen.value = false
+  panel.value = 'bag'
+}
+
+function chooseSearch(item) {
+  searchOpen.value = false
+  searchQuery.value = ''
+  if (item.href) {
+    navigateTo(item.href)
+    return
+  }
+  openProduct(item, 'all')
+}
+
+function orderLabel(order) {
+  return order.product_name || order.sale_items?.[0]?.product_name || 'Custom order'
+}
+
+function orderStatusLabel(status) {
+  return OrderStatusLabels[status] || 'In progress'
+}
+
+async function loadOrders() {
+  if (!isAuthenticated.value) return
+  ordersLoading.value = true
+  ordersError.value = ''
+  try {
+    orders.value = await CustomerOrderService.getMine()
+  } catch (err) {
+    ordersError.value = err.message
+  } finally {
+    ordersLoading.value = false
+  }
+}
+
+async function loadShop() {
+  try {
+    const result = await ProductService.getAll({
+      limit: 24,
+      sortBy: 'created_at',
+      sortOrder: 'desc',
+    })
+    shopProducts.value = result.data || []
+  } catch {
+    shopProducts.value = []
+  }
+}
 
 const scrollTo = (id) => {
   const root = scroller.value
@@ -442,7 +683,26 @@ const scrollTo = (id) => {
 
 const openAlbum = (index) => {
   collectionIndex.value = index
-  lookIndex.value = 0
+  albumMode.value = 'collection'
+  albumFrom.value = 'collection'
+  searchOpen.value = false
+  albumOpen.value = true
+}
+
+const openAllProducts = () => {
+  albumMode.value = 'all'
+  albumFrom.value = 'all'
+  searchOpen.value = false
+  albumOpen.value = true
+}
+
+const openProduct = (item, from = 'collection') => {
+  collectionIndex.value = item.collectionIndex
+  lookIndex.value = item.lookIndex
+  imageIndex.value = 0
+  albumFrom.value = from
+  albumMode.value = 'product'
+  searchOpen.value = false
   albumOpen.value = true
 }
 
@@ -450,13 +710,9 @@ const closeAlbum = () => {
   albumOpen.value = false
 }
 
-const stepLook = (direction) => {
-  const total = activeCollection.value?.looks.length || 1
-  lookIndex.value = (lookIndex.value + direction + total) % total
-}
-
-const stepReview = (direction) => {
-  reviewIndex.value = (reviewIndex.value + direction + reviews.length) % reviews.length
+const stepImage = (direction) => {
+  const total = activeLookImages.value.length || 1
+  imageIndex.value = (imageIndex.value + direction + total) % total
 }
 
 let frameId = 0
@@ -748,7 +1004,7 @@ const movePage = (delta) => {
 }
 
 const onWheel = (event) => {
-  if (albumOpen.value || event.target.closest('.ed-album')) return
+  if (panel.value || albumOpen.value || event.target.closest('.ed-album') || event.target.closest('.ed-drawer')) return
   event.preventDefault()
   const delta = wheelPixels(event)
   goal = null
@@ -773,7 +1029,7 @@ const onTouchStart = (event) => {
 }
 
 const onTouchMove = (event) => {
-  if (albumOpen.value || event.target.closest('.ed-album')) return
+  if (panel.value || albumOpen.value || event.target.closest('.ed-album') || event.target.closest('.ed-drawer')) return
   const nextY = event.touches[0]?.clientY || touchY
   const delta = touchY - nextY
   touchY = nextY
@@ -803,8 +1059,17 @@ const onTouchEnd = () => {
   touchSamples.length = 0
 }
 
+const onEscape = () => {
+  if (searchOpen.value) {
+    searchOpen.value = false
+    return
+  }
+  if (panel.value) closePanel()
+  else closeAlbum()
+}
+
 const onKeydown = (event) => {
-  if (event.key === 'Escape') closeAlbum()
+  if (event.key === 'Escape') onEscape()
 }
 
 onMounted(async () => {
@@ -821,6 +1086,11 @@ onMounted(async () => {
   window.addEventListener('keydown', onKeydown)
   window.addEventListener('pointermove', onPointerMove)
   applyMotion()
+  const requested = route.query.panel
+  if (requested === 'orders' || requested === 'bag' || requested === 'profile' || window.location.hash === '#you') {
+    openPanel(requested === 'orders' || requested === 'bag' ? requested : 'profile')
+  }
+  loadShop()
   if (!reduceMotion) frameId = requestAnimationFrame(loop)
 
   const revealItems = root?.querySelectorAll('.ed-rv') || []
@@ -841,18 +1111,6 @@ onMounted(async () => {
       })
     })
     onUnmounted(() => observer.disconnect())
-  }
-
-  try {
-    const result = await ProductService.getAll({
-      limit: 1,
-      sortBy: 'selling_price',
-      sortOrder: 'asc',
-    })
-    const price = Number(result.data?.[0]?.selling_price)
-    if (price > 0) startingPrice.value = price
-  } catch {
-    startingPrice.value = null
   }
 })
 
@@ -959,6 +1217,15 @@ onUnmounted(() => {
 .ed-start:hover,
 .ed-nav a:hover {
   color: var(--ed-rose);
+}
+
+button.ed-start {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
 }
 
 .ed-nav {
@@ -1144,17 +1411,8 @@ onUnmounted(() => {
   margin-top: 72px;
 }
 
-#pricing,
-#reviews,
-#faq {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-#reviews h2 {
-  max-width: 16em;
-  font-size: clamp(34px, 4vw, 56px);
+#reviews {
+  padding-top: 8px;
 }
 
 .ed-lab {
@@ -1211,7 +1469,7 @@ h2 {
 .ed-hero-copy {
   min-width: 0;
   align-self: start;
-  padding-top: 12px;
+  padding-top: 72px;
 }
 
 .ed-hero-grid p {
@@ -1230,7 +1488,9 @@ h2 {
 }
 
 .ed-btn {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   border: 1.5px solid var(--ed-ink);
   border-radius: 99px;
   padding: 12px 22px;
@@ -1238,6 +1498,12 @@ h2 {
   background: none;
   margin: 0 8px 8px 0;
   transition: 0.3s;
+
+  svg {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+  }
 
   &:hover {
     background: var(--ed-ink);
@@ -1266,6 +1532,224 @@ h2 {
     background: #fbf4ec;
     border: 0;
     color: #231a1d;
+  }
+}
+
+.ed-icons {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+.ed-icon {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ed-ink);
+  background: transparent;
+  color: var(--ed-ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  &:hover {
+    background: var(--ed-ink);
+    color: var(--ed-bg);
+  }
+
+  &__count {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 99px;
+    background: var(--ed-rose);
+    color: #fff;
+    font-size: 10px;
+    line-height: 16px;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+}
+
+.ed-lookbook {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.ed-look {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  background: var(--ed-card);
+  min-height: 360px;
+}
+
+.ed-look__open {
+  display: block;
+  width: 100%;
+  height: 420px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+}
+
+.ed-look figcaption {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  color: #fff;
+
+  strong {
+    display: block;
+    font-family: "Cormorant Garamond", Georgia, serif;
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  span {
+    font-size: 13px;
+    letter-spacing: 0.04em;
+  }
+}
+
+.ed-look__actions {
+  display: flex;
+  gap: 6px;
+
+  button {
+    position: relative;
+    width: 36px;
+    height: 36px;
+    border: 0;
+    border-radius: 50%;
+    background: #fffcf7;
+    color: #231a1d;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+  }
+}
+
+.ed-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: #231a1d;
+  color: #fbf4ec;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ed-tip:hover::after,
+.ed-tip:focus-visible::after {
+  opacity: 1;
+}
+
+.ed-icon.ed-tip::after {
+  bottom: auto;
+  top: calc(100% + 8px);
+}
+
+.ed-search {
+  position: absolute;
+  z-index: 24;
+  top: 22px;
+  left: calc(var(--rail) + 40px);
+  width: min(380px, 36vw);
+
+  input {
+    width: 100%;
+    height: 46px;
+    border: 0;
+    border-radius: 999px;
+    padding: 0 18px;
+    background: #fffcf7;
+    box-shadow: 0 12px 28px rgba(35, 26, 29, 0.12);
+    color: var(--ed-ink);
+    font: inherit;
+    outline: none;
+  }
+
+  &__list {
+    margin: 8px 0 0;
+    padding: 6px;
+    list-style: none;
+    background: #fffcf7;
+    border-radius: 16px;
+    box-shadow: 0 18px 40px rgba(35, 26, 29, 0.16);
+  }
+
+  li {
+    color: var(--ed-mute);
+    padding: 8px;
+  }
+
+  button {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 42px 1fr auto;
+    gap: 10px;
+    align-items: center;
+    border: 0;
+    background: none;
+    color: var(--ed-ink);
+    text-align: left;
+    padding: 6px;
+    cursor: pointer;
+  }
+
+  img {
+    width: 42px;
+    height: 54px;
+    object-fit: cover;
+    border-radius: 8px;
+  }
+
+  b {
+    font-size: 13px;
   }
 }
 
@@ -1433,25 +1917,29 @@ h2 {
   grid-template-columns: repeat(3, 1fr);
 }
 
-.ed-why {
+.ed-reviews {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 14px;
 }
 
-.ed-why__card {
+.ed-review {
   border-radius: 18px;
-  padding: 22px;
+  padding: 28px 22px;
   color: #2a1d20;
+  min-height: 220px;
 
   h3 {
-    font-size: 22px;
-    margin-bottom: 8px;
+    font-size: clamp(22px, 2vw, 30px);
+    line-height: 1.15;
+    margin-bottom: 16px;
   }
 
   p {
     margin: 0;
     font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     color: #5a4a4d;
   }
 }
@@ -1504,7 +1992,15 @@ h2 {
   height: 42px;
   border-radius: 50%;
   border: 1.5px solid var(--ed-ink);
-  font-size: 17px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
 }
 
 .ed-sec details {
@@ -1577,6 +2073,135 @@ h2 {
   gap: 14px;
   font-size: 11px;
   font-weight: 600;
+
+  button {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    cursor: pointer;
+  }
+}
+
+.ed-drawer {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+
+  &__scrim {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: rgba(35, 26, 29, 0.32);
+    cursor: pointer;
+  }
+
+  &__sheet {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    bottom: 16px;
+    width: min(520px, calc(100% - 32px));
+    overflow: auto;
+    background: #fffcf7;
+    border: 0;
+    border-radius: 28px;
+    box-shadow: 0 24px 60px rgba(35, 26, 29, 0.24);
+    padding: 28px 24px 48px;
+  }
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+
+    h2 {
+      margin: 0;
+      font-size: 40px;
+    }
+
+    button {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 1.5px solid var(--ed-ink);
+      background: transparent;
+      font-size: 22px;
+      line-height: 1;
+      cursor: pointer;
+    }
+  }
+
+  &__note {
+    color: var(--ed-mute);
+  }
+}
+
+.ed-shop {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+
+  &__card {
+    position: relative;
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    img {
+      width: 100%;
+      aspect-ratio: 3 / 4;
+      object-fit: cover;
+      border-radius: 16px;
+      display: block;
+      background: #f5d5d3;
+    }
+
+    strong {
+      display: block;
+      margin-top: 8px;
+      font-family: "Cormorant Garamond", Georgia, serif;
+      font-size: 22px;
+      font-weight: 600;
+    }
+
+    > button {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 0;
+      background: #fffcf7;
+      color: var(--ed-ink);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+
+      svg {
+        width: 16px;
+        height: 16px;
+      }
+    }
+  }
 }
 
 .ed-rv {
@@ -1628,6 +2253,57 @@ h2 {
   gap: 34px;
 }
 
+.ed-stage {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.ed-catalog h2 {
+  margin-bottom: 8px;
+}
+
+.ed-product-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.ed-product {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  img {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    border-radius: 16px;
+    display: block;
+    background: #f5d5d3;
+  }
+
+  strong {
+    display: block;
+    margin-top: 8px;
+    font-family: "Cormorant Garamond", Georgia, serif;
+    font-size: 22px;
+    font-weight: 600;
+  }
+
+  span {
+    color: var(--ed-mute);
+    font-size: 13px;
+  }
+}
+
 .ed-big {
   aspect-ratio: 4 / 5;
   border-radius: 22px;
@@ -1640,6 +2316,39 @@ h2 {
   }
 }
 
+.ed-orders {
+  h3 {
+    font-size: 28px;
+    margin: 8px 0 10px;
+  }
+
+  ul {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 18px;
+  }
+
+  li {
+    display: grid;
+    gap: 2px;
+    padding: 12px 0;
+    border-bottom: 1px solid #f0d2d4;
+  }
+
+  b {
+    color: var(--ed-rose);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+}
+
+.ed-album__price {
+  margin: 8px 0 4px;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 36px;
+}
+
 .ed-album__copy {
   color: var(--ed-mute);
   max-width: 420px;
@@ -1647,7 +2356,7 @@ h2 {
 
 .ed-thumbs {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(3, 72px);
   gap: 8px;
   margin-top: 12px;
 
@@ -1818,10 +2527,45 @@ h2 {
   }
 
   .ed-hero-grid,
-  .ed-steps,
-  .ed-why,
+  .ed-reviews,
   .ed-album__body {
     grid-template-columns: 1fr;
+  }
+
+  .ed-search {
+    top: 74px;
+    left: 16px;
+    right: 16px;
+    width: auto;
+  }
+
+  .ed-hero-copy {
+    padding-top: 64px;
+  }
+
+  .ed-lookbook,
+  .ed-album__body {
+    grid-template-columns: 1fr;
+  }
+
+  .ed-product-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ed-look__open {
+    height: 280px;
+  }
+
+  .ed-stage {
+    grid-template-columns: auto 1fr auto;
+  }
+
+  .ed-icons {
+    margin: 0;
+  }
+
+  .ed-start {
+    display: none;
   }
 
   .ed-cats {

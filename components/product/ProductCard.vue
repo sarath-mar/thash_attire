@@ -55,6 +55,11 @@
       </div>
       <h3 class="ta-product-card__name">{{ product.name }}</h3>
 
+      <div class="ta-product-card__buy" @click.stop>
+        <button type="button" @click="addToBag">Add to bag</button>
+        <button type="button" class="is-checkout" @click="checkoutNow">Checkout</button>
+      </div>
+
       <div class="d-flex justify-space-between align-center mt-2">
         <span class="ta-product-card__price">{{ formattedPrice }}</span>
 
@@ -105,6 +110,45 @@ const whatsappQuickOrderLink = computed(() => {
   const msg = `Hi Thash Attire! I'm interested in buying: ${props.product.name} (SKU: ${props.product.sku || 'N/A'}) priced at ${formattedPrice.value}. Is it available?`
   return getWhatsAppLink(config.public.whatsappNumber, msg)
 })
+
+const { addItem } = useCart()
+const { openBag } = useBagDrawer()
+const { isAuthenticated } = useCustomerAuth()
+const { success, error: showError } = useSnackbar()
+
+function putInBag() {
+  const sizes = props.product.sizes || []
+  const colors = props.product.colors || []
+  if (sizes.length > 1 || colors.length > 1) {
+    navigateTo(Routes.PRODUCT_DETAIL(props.product.id))
+    return false
+  }
+  addItem({
+    productId: props.product.id,
+    name: props.product.name,
+    price: Number(props.product.selling_price) || 0,
+    image: imageUrl.value,
+    size: sizes[0] || '',
+    color: colors[0] || '',
+    quantity: 1,
+    sku: props.product.sku || '',
+  })
+  return true
+}
+
+function addToBag() {
+  if (!putInBag()) return
+  success('Added to your bag')
+}
+
+async function checkoutNow() {
+  if (!putInBag()) return
+  if (!isAuthenticated.value) {
+    await navigateTo({ path: '/login', query: { redirect: '/?panel=bag' } })
+    return
+  }
+  openBag()
+}
 
 const navigateToProduct = () => {
   navigateTo(Routes.PRODUCT_DETAIL(props.product.id))
@@ -188,6 +232,28 @@ const navigateToProduct = () => {
     color: #c0392b;
     font-weight: 600;
     letter-spacing: 0.05em;
+  }
+
+  &__buy {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: var(--spacing-sm);
+
+    button {
+      @include button-reset;
+      height: 36px;
+      border: 1px solid var(--color-primary);
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .is-checkout {
+      background: var(--color-primary);
+      color: var(--color-text-inverse);
+    }
   }
 
   &__overlay {

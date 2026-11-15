@@ -26,7 +26,7 @@
                 hide-details
               >
                 <template #item="{ props, item }">
-                  <v-list-item v-bind="props" :title="item.raw.name" :subtitle="item.raw.phone" />
+                  <v-list-item v-bind="props" :title="item.raw.name" :subtitle="item.raw.phone || item.raw.email || 'No phone yet'" />
                 </template>
               </v-autocomplete>
               <v-btn color="primary" variant="tonal" height="48" @click="customerDialog = true">
@@ -364,7 +364,9 @@ const paymentStatusOptions = Object.entries(PaymentStatusLabels).map(([value, la
 
 const customerFilter = (item, queryText) => {
   const q = queryText.toLowerCase()
-  return item.raw.name.toLowerCase().includes(q) || item.raw.phone.includes(q)
+  return item.raw.name.toLowerCase().includes(q)
+    || (item.raw.phone || '').toLowerCase().includes(q)
+    || (item.raw.email || '').toLowerCase().includes(q)
 }
 
 const onCustomerSelect = (customer) => {

@@ -1,6 +1,7 @@
 <template>
   <div>
     <slot />
-    <AppSnackbar />
+    <CommonAppSnackbar />
+    <CustomerBagDrawer />
   </div>
 </template>

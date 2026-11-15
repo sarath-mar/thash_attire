@@ -41,6 +41,26 @@
             <v-icon icon="mdi-magnify" size="22" />
           </NuxtLink>
 
+          <button type="button" class="ta-header__action-btn" aria-label="Bag" @click="openBag">
+            <v-icon icon="mdi-shopping-outline" size="22" />
+            <span v-if="cartCount" class="ta-header__badge">{{ cartCount }}</span>
+          </button>
+
+          <v-menu v-if="isCustomer" location="bottom end">
+            <template #activator="{ props }">
+              <button v-bind="props" type="button" class="ta-header__action-btn" aria-label="Account">
+                <v-icon icon="mdi-account-outline" size="22" />
+              </button>
+            </template>
+            <v-list density="compact" min-width="180">
+              <v-list-item title="Your details" to="/?panel=profile" />
+              <v-list-item title="Log out" @click="logout" />
+            </v-list>
+          </v-menu>
+          <NuxtLink v-else to="/login" class="ta-header__action-btn" aria-label="Sign in">
+            <v-icon icon="mdi-account-outline" size="22" />
+          </NuxtLink>
+
           <a
             :href="whatsappLink"
             target="_blank"
@@ -74,6 +94,11 @@ const config = useRuntimeConfig()
 const navItems = PublicNavItems
 const mobileMenuOpen = ref(false)
 const isScrolled = ref(false)
+const { count } = useCart()
+const { openBag } = useBagDrawer()
+const { isAuthenticated, logout } = useCustomerAuth()
+const cartCount = computed(() => count.value)
+const isCustomer = computed(() => isAuthenticated.value)
 
 const whatsappLink = computed(() =>
   getWhatsAppLink(config.public.whatsappNumber, 'Hi Thash Attire! I would like to explore your latest collection.'),
@@ -169,6 +194,10 @@ onMounted(() => {
     color: var(--color-accent);
     line-height: 1;
     text-transform: none;
+
+    @include respond-below(sm) {
+      font-size: 1.55rem;
+    }
   }
 
   &__logo-sub {
@@ -178,6 +207,12 @@ onMounted(() => {
     letter-spacing: 0.16em;
     color: var(--color-text-secondary);
     text-transform: uppercase;
+    white-space: nowrap;
+
+    @include respond-below(sm) {
+      font-size: 0.52rem;
+      letter-spacing: 0.08em;
+    }
   }
 
   &__nav {
@@ -244,11 +279,14 @@ onMounted(() => {
   }
 
   &__action-btn {
+    @include button-reset;
+    position: relative;
     @include flex-center;
     width: 38px;
     height: 38px;
     border-radius: var(--radius-full);
     color: var(--color-primary);
+    text-decoration: none;
     transition: all var(--transition-fast);
 
     &:hover {
@@ -257,8 +295,27 @@ onMounted(() => {
     }
   }
 
+  &__badge {
+    position: absolute;
+    top: 2px;
+    right: 0;
+    min-width: 16px;
+    height: 16px;
+    padding-inline: 4px;
+    border-radius: var(--radius-full);
+    background: var(--color-accent);
+    color: #fff;
+    font-size: 0.65rem;
+    line-height: 16px;
+    text-align: center;
+  }
+
   &__whatsapp-btn {
     @include flex-center;
+
+    @include respond-below(sm) {
+      display: none;
+    }
     padding: 8px 16px;
     border-radius: var(--radius-full);
     background: #25D366;

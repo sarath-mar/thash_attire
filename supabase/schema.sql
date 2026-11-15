@@ -2,6 +2,7 @@
 -- Thash Attire — Supabase Schema (source of truth)
 -- ============================================================
 -- Run this file in the Supabase SQL Editor for a fresh install.
+-- Existing projects: run supabase/customer_auth.sql instead.
 -- ============================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -135,8 +136,10 @@ CREATE TABLE IF NOT EXISTS product_samples (
 -- ─── Customers ──────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS customers (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  auth_user_id UUID UNIQUE REFERENCES auth.users(id) ON DELETE SET NULL,
   name TEXT NOT NULL,
-  phone TEXT UNIQUE NOT NULL,
+  email TEXT,
+  phone TEXT UNIQUE,
   address TEXT,
   notes TEXT,
   total_orders INTEGER DEFAULT 0,
@@ -144,6 +147,10 @@ CREATE TABLE IF NOT EXISTS customers (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_email_lower
+  ON customers (lower(email))
+  WHERE email IS NOT NULL;
 
 -- ─── Offers / Combos ────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS offers (
@@ -334,6 +341,77 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
 
+-- Existing admin users have no account_type claim and keep full staff access.
+-- New auth users are marked as storefront customers. Promote a real admin with:
+-- UPDATE profiles SET role = 'admin' WHERE email = 'your-admin@email.com';
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM profiles
+    WHERE id = auth.uid() AND role = 'admin'
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_staff()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT
+    auth.uid() IS NOT NULL
+    AND (
+      public.is_admin()
+      OR COALESCE(auth.jwt() -> 'app_metadata' ->> 'account_type', '') IS DISTINCT FROM 'customer'
+    );
+$$;
+
+CREATE OR REPLACE FUNCTION public.mark_storefront_customer()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  NEW.raw_app_meta_data :=
+    COALESCE(NEW.raw_app_meta_data, '{}'::jsonb)
+    || jsonb_build_object('account_type', 'customer');
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS mark_storefront_customer ON auth.users;
+CREATE TRIGGER mark_storefront_customer
+  BEFORE INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.mark_storefront_customer();
+
+CREATE OR REPLACE FUNCTION public.prevent_profile_role_escalation()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NEW.role IS DISTINCT FROM OLD.role
+     AND auth.uid() IS NOT NULL
+     AND NOT public.is_admin() THEN
+    RAISE EXCEPTION 'Cannot change role';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS prevent_profile_role_escalation ON profiles;
+CREATE TRIGGER prevent_profile_role_escalation
+  BEFORE UPDATE ON profiles
+  FOR EACH ROW EXECUTE FUNCTION public.prevent_profile_role_escalation();
+
 -- ─── RPC: record material purchase (weighted avg) ───────────
 CREATE OR REPLACE FUNCTION record_material_purchase(
   p_material_id UUID,
@@ -351,6 +429,10 @@ DECLARE
   v_current_avg NUMERIC;
   v_new_avg NUMERIC;
 BEGIN
+  IF NOT public.is_staff() THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+
   IF p_quantity IS NULL OR p_quantity <= 0 THEN
     RAISE EXCEPTION 'Purchase quantity must be greater than 0';
   END IF;
@@ -404,6 +486,10 @@ DECLARE
   v_new_stock NUMERIC;
   v_new_avg NUMERIC;
 BEGIN
+  IF NOT public.is_staff() THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+
   SELECT material_id, quantity, unit_cost
   INTO v_material_id, v_quantity, v_unit_cost
   FROM material_purchases
@@ -472,6 +558,10 @@ DECLARE
   v_images TEXT[];
   v_videos TEXT[];
 BEGIN
+  IF NOT public.is_staff() THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+
   IF p_product->'colors' IS NOT NULL THEN
     v_colors := ARRAY(SELECT jsonb_array_elements_text(p_product->'colors'));
   ELSE
@@ -590,6 +680,10 @@ DECLARE
   v_item JSONB;
   v_current_stock INTEGER;
 BEGIN
+  IF NOT public.is_staff() THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+
   INSERT INTO sales (
     order_number, customer_id, customer_name, customer_phone, offer_id,
     discount, final_amount, payment_method, payment_status,
@@ -648,6 +742,305 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- ─── Customer profile + storefront orders ───────────────────
+CREATE OR REPLACE FUNCTION public.prevent_customer_account_relink()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NEW.auth_user_id IS DISTINCT FROM OLD.auth_user_id THEN
+    IF NOT (
+      auth.uid() IS NULL
+      OR public.is_admin()
+      OR NEW.auth_user_id = auth.uid()
+    ) THEN
+      RAISE EXCEPTION 'Cannot change account link';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS prevent_customer_account_relink ON customers;
+CREATE TRIGGER prevent_customer_account_relink
+  BEFORE UPDATE ON customers
+  FOR EACH ROW EXECUTE FUNCTION public.prevent_customer_account_relink();
+
+CREATE OR REPLACE FUNCTION public.upsert_my_customer_profile(
+  p_name TEXT DEFAULT NULL,
+  p_email TEXT DEFAULT NULL,
+  p_phone TEXT DEFAULT NULL,
+  p_address TEXT DEFAULT NULL
+) RETURNS customers
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_uid UUID := auth.uid();
+  v_email TEXT;
+  v_phone TEXT;
+  v_row customers;
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'Please sign in to continue';
+  END IF;
+
+  v_email := NULLIF(lower(trim(COALESCE(p_email, auth.jwt() ->> 'email', ''))), '');
+  v_phone := NULLIF(regexp_replace(COALESCE(p_phone, ''), '\D', '', 'g'), '');
+  IF v_phone IS NOT NULL AND length(v_phone) >= 10 THEN
+    v_phone := right(v_phone, 10);
+  END IF;
+  IF v_phone IS NOT NULL AND v_phone !~ '^[6-9][0-9]{9}$' THEN
+    RAISE EXCEPTION 'Enter a valid 10-digit mobile number';
+  END IF;
+
+  SELECT * INTO v_row FROM customers WHERE auth_user_id = v_uid LIMIT 1;
+
+  IF NOT FOUND AND v_email IS NOT NULL THEN
+    SELECT * INTO v_row
+    FROM customers
+    WHERE email IS NOT NULL
+      AND lower(email) = v_email
+      AND (auth_user_id IS NULL OR auth_user_id = v_uid)
+    ORDER BY created_at
+    LIMIT 1;
+  END IF;
+
+  IF NOT FOUND AND v_phone IS NOT NULL THEN
+    SELECT * INTO v_row
+    FROM customers
+    WHERE phone IS NOT NULL
+      AND right(regexp_replace(phone, '\D', '', 'g'), 10) = v_phone
+      AND (auth_user_id IS NULL OR auth_user_id = v_uid)
+    ORDER BY created_at
+    LIMIT 1;
+  END IF;
+
+  IF v_phone IS NOT NULL AND EXISTS (
+    SELECT 1 FROM customers
+    WHERE phone IS NOT NULL
+      AND right(regexp_replace(phone, '\D', '', 'g'), 10) = v_phone
+      AND (v_row.id IS NULL OR id <> v_row.id)
+      AND (auth_user_id IS NULL OR auth_user_id <> v_uid)
+  ) THEN
+    RAISE EXCEPTION 'This mobile number is already used by another customer';
+  END IF;
+
+  IF v_email IS NOT NULL AND EXISTS (
+    SELECT 1 FROM customers
+    WHERE email IS NOT NULL
+      AND lower(email) = v_email
+      AND auth_user_id IS NOT NULL
+      AND auth_user_id <> v_uid
+      AND (v_row.id IS NULL OR id <> v_row.id)
+  ) THEN
+    RAISE EXCEPTION 'This email is already linked to another customer';
+  END IF;
+
+  IF v_row.id IS NOT NULL THEN
+    UPDATE customers
+    SET
+      auth_user_id = v_uid,
+      name = COALESCE(NULLIF(trim(p_name), ''), name),
+      email = COALESCE(v_email, email),
+      phone = COALESCE(v_phone, phone),
+      address = COALESCE(NULLIF(trim(p_address), ''), address),
+      updated_at = NOW()
+    WHERE id = v_row.id
+    RETURNING * INTO v_row;
+  ELSE
+    INSERT INTO customers (auth_user_id, name, email, phone, address)
+    VALUES (
+      v_uid,
+      COALESCE(NULLIF(trim(p_name), ''), NULLIF(split_part(COALESCE(v_email, ''), '@', 1), ''), 'Customer'),
+      v_email,
+      v_phone,
+      NULLIF(trim(COALESCE(p_address, '')), '')
+    )
+    RETURNING * INTO v_row;
+  END IF;
+
+  RETURN v_row;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.place_customer_order(
+  p_items JSONB,
+  p_shipping_address TEXT,
+  p_payment_method TEXT,
+  p_name TEXT DEFAULT NULL,
+  p_phone TEXT DEFAULT NULL,
+  p_notes TEXT DEFAULT NULL
+) RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_uid UUID := auth.uid();
+  v_customer customers;
+  v_item JSONB;
+  v_product products;
+  v_qty INTEGER;
+  v_sale_id UUID;
+  v_order_number TEXT;
+  v_final NUMERIC := 0;
+  v_first_product_id UUID;
+  v_first_price NUMERIC;
+  v_total_qty INTEGER := 0;
+  v_names TEXT[] := '{}';
+  v_size TEXT;
+  v_color TEXT;
+  v_label TEXT;
+  v_summary TEXT;
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'Please sign in to place an order';
+  END IF;
+
+  IF p_shipping_address IS NULL OR length(trim(p_shipping_address)) < 8 THEN
+    RAISE EXCEPTION 'Please enter a complete shipping address';
+  END IF;
+
+  IF p_payment_method NOT IN ('cash', 'upi') THEN
+    RAISE EXCEPTION 'Please choose a valid payment method';
+  END IF;
+
+  IF p_items IS NULL OR jsonb_typeof(p_items) <> 'array' OR jsonb_array_length(p_items) = 0 THEN
+    RAISE EXCEPTION 'Your bag is empty';
+  END IF;
+
+  v_customer := public.upsert_my_customer_profile(p_name, NULL, p_phone, p_shipping_address);
+
+  IF v_customer.phone IS NULL OR v_customer.phone = '' THEN
+    RAISE EXCEPTION 'Please add a mobile number to continue';
+  END IF;
+
+  LOOP
+    v_order_number := 'TA'
+      || to_char(NOW() AT TIME ZONE 'Asia/Kolkata', 'YYMMDD')
+      || upper(substr(md5(random()::text || clock_timestamp()::text), 1, 6));
+    EXIT WHEN NOT EXISTS (SELECT 1 FROM sales WHERE order_number = v_order_number);
+  END LOOP;
+
+  INSERT INTO sales (
+    order_number, customer_id, customer_name, customer_phone,
+    discount, final_amount, payment_method, payment_status,
+    status, sale_date, order_date, shipping_address, notes, status_history
+  ) VALUES (
+    v_order_number,
+    v_customer.id,
+    v_customer.name,
+    v_customer.phone,
+    0,
+    0,
+    p_payment_method,
+    'pending',
+    'order_received',
+    NOW(),
+    NOW(),
+    trim(p_shipping_address),
+    NULLIF(trim(COALESCE(p_notes, '')), ''),
+    jsonb_build_array(jsonb_build_object('status', 'order_received', 'date', NOW()))
+  ) RETURNING id INTO v_sale_id;
+
+  FOR v_item IN SELECT value FROM jsonb_array_elements(p_items)
+  LOOP
+    IF (v_item->>'product_id') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+      RAISE EXCEPTION 'A piece in your bag is no longer available';
+    END IF;
+
+    v_qty := COALESCE((v_item->>'quantity')::INTEGER, 0);
+    IF v_qty < 1 OR v_qty > 20 THEN
+      RAISE EXCEPTION 'Quantity must be between 1 and 20';
+    END IF;
+
+    SELECT * INTO v_product
+    FROM products
+    WHERE id = (v_item->>'product_id')::UUID
+    FOR UPDATE;
+
+    IF NOT FOUND
+       OR v_product.status IS DISTINCT FROM 'active'
+       OR COALESCE(v_product.is_showcase, false) THEN
+      RAISE EXCEPTION 'A piece in your bag is no longer available';
+    END IF;
+
+    v_size := NULLIF(trim(COALESCE(v_item->>'size', '')), '');
+    v_color := NULLIF(trim(COALESCE(v_item->>'color', '')), '');
+    v_label := v_product.name;
+    IF v_color IS NOT NULL OR v_size IS NOT NULL THEN
+      v_label := v_label || ' (' || concat_ws(', ', v_color, v_size) || ')';
+    END IF;
+
+    IF v_first_product_id IS NULL THEN
+      v_first_product_id := v_product.id;
+      v_first_price := v_product.selling_price;
+    END IF;
+
+    v_names := array_append(v_names, v_label);
+    v_total_qty := v_total_qty + v_qty;
+    v_final := v_final + (COALESCE(v_product.selling_price, 0) * v_qty);
+
+    INSERT INTO sale_items (
+      sale_id, product_id, product_name, quantity, selling_price, cost_price
+    ) VALUES (
+      v_sale_id,
+      v_product.id,
+      v_label,
+      v_qty,
+      COALESCE(v_product.selling_price, 0),
+      COALESCE(v_product.cost_price, 0)
+    );
+
+    IF COALESCE(v_product.stock, 0) >= v_qty THEN
+      UPDATE products
+      SET stock = stock - v_qty, updated_at = NOW()
+      WHERE id = v_product.id;
+    END IF;
+  END LOOP;
+
+  IF array_length(v_names, 1) > 1 THEN
+    v_summary := v_names[1] || ' + ' || (array_length(v_names, 1) - 1)::TEXT || ' more';
+  ELSE
+    v_summary := v_names[1];
+  END IF;
+
+  UPDATE sales
+  SET
+    product_id = v_first_product_id,
+    product_name = v_summary,
+    quantity = v_total_qty,
+    selling_price = v_first_price,
+    final_amount = v_final,
+    updated_at = NOW()
+  WHERE id = v_sale_id;
+
+  UPDATE customers
+  SET
+    total_orders = COALESCE(total_orders, 0) + 1,
+    total_amount = COALESCE(total_amount, 0) + v_final,
+    updated_at = NOW()
+  WHERE id = v_customer.id;
+
+  RETURN jsonb_build_object(
+    'id', v_sale_id,
+    'order_number', v_order_number,
+    'final_amount', v_final
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.upsert_my_customer_profile(TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.upsert_my_customer_profile(TEXT, TEXT, TEXT, TEXT) TO authenticated;
+REVOKE ALL ON FUNCTION public.place_customer_order(JSONB, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.place_customer_order(JSONB, TEXT, TEXT, TEXT, TEXT, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.is_staff() TO authenticated, service_role;
+
 -- ─── Row Level Security ─────────────────────────────────────
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
@@ -687,37 +1080,60 @@ CREATE POLICY "Public read offer items" ON offer_items
   FOR SELECT TO anon, authenticated
   USING (true);
 
--- Authenticated admin app access (login-gated in the Nuxt app)
-CREATE POLICY "Authenticated full access categories" ON categories
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Authenticated full access products" ON products
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Authenticated full access materials" ON materials
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Authenticated full access product_materials" ON product_materials
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Authenticated full access material_purchases" ON material_purchases
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Authenticated full access material_stock_movements" ON material_stock_movements
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Authenticated full access product_samples" ON product_samples
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Authenticated full access customers" ON customers
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Authenticated full access offers" ON offers
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Authenticated full access offer_items" ON offer_items
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Authenticated full access sales" ON sales
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Authenticated full access sale_items" ON sale_items
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Authenticated full access expenses" ON expenses
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Authenticated full access banners" ON banners
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Authenticated full access settings" ON settings
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+-- Staff access keeps the admin panel working for existing admin sessions.
+-- Storefront customers only receive the own-row policies below.
+CREATE POLICY "Staff manage categories" ON categories
+  FOR ALL TO authenticated USING (public.is_staff()) WITH CHECK (public.is_staff());
+CREATE POLICY "Staff manage products" ON products
+  FOR ALL TO authenticated USING (public.is_staff()) WITH CHECK (public.is_staff());
+CREATE POLICY "Staff manage materials" ON materials
+  FOR ALL TO authenticated USING (public.is_staff()) WITH CHECK (public.is_staff());
+CREATE POLICY "Staff manage product_materials" ON product_materials
+  FOR ALL TO authenticated USING (public.is_staff()) WITH CHECK (public.is_staff());
+CREATE POLICY "Staff manage material_purchases" ON material_purchases
+  FOR ALL TO authenticated USING (public.is_staff()) WITH CHECK (public.is_staff());
+CREATE POLICY "Staff manage material_stock_movements" ON material_stock_movements
+  FOR ALL TO authenticated USING (public.is_staff()) WITH CHECK (public.is_staff());
+CREATE POLICY "Staff manage product_samples" ON product_samples
+  FOR ALL TO authenticated USING (public.is_staff()) WITH CHECK (public.is_staff());
+CREATE POLICY "Staff manage customers" ON customers
+  FOR ALL TO authenticated USING (public.is_staff()) WITH CHECK (public.is_staff());
+CREATE POLICY "Customers read own profile" ON customers
+  FOR SELECT TO authenticated USING (auth_user_id = auth.uid());
+CREATE POLICY "Customers update own profile" ON customers
+  FOR UPDATE TO authenticated
+  USING (auth_user_id = auth.uid())
+  WITH CHECK (auth_user_id = auth.uid());
+CREATE POLICY "Staff manage offers" ON offers
+  FOR ALL TO authenticated USING (public.is_staff()) WITH CHECK (public.is_staff());
+CREATE POLICY "Staff manage offer_items" ON offer_items
+  FOR ALL TO authenticated USING (public.is_staff()) WITH CHECK (public.is_staff());
+CREATE POLICY "Staff manage sales" ON sales
+  FOR ALL TO authenticated USING (public.is_staff()) WITH CHECK (public.is_staff());
+CREATE POLICY "Customers read own orders" ON sales
+  FOR SELECT TO authenticated
+  USING (
+    customer_id IN (SELECT id FROM customers WHERE auth_user_id = auth.uid())
+  );
+CREATE POLICY "Staff manage sale_items" ON sale_items
+  FOR ALL TO authenticated USING (public.is_staff()) WITH CHECK (public.is_staff());
+CREATE POLICY "Customers read own sale items" ON sale_items
+  FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM sales s
+      JOIN customers c ON c.id = s.customer_id
+      WHERE s.id = sale_items.sale_id
+        AND c.auth_user_id = auth.uid()
+    )
+  );
+CREATE POLICY "Staff manage expenses" ON expenses
+  FOR ALL TO authenticated USING (public.is_staff()) WITH CHECK (public.is_staff());
+CREATE POLICY "Staff manage banners" ON banners
+  FOR ALL TO authenticated USING (public.is_staff()) WITH CHECK (public.is_staff());
+CREATE POLICY "Staff manage settings" ON settings
+  FOR ALL TO authenticated USING (public.is_staff()) WITH CHECK (public.is_staff());
 
 CREATE POLICY "Users can read own profile" ON profiles
   FOR SELECT TO authenticated USING (auth.uid() = id);
@@ -725,8 +1141,8 @@ CREATE POLICY "Users can read own profile" ON profiles
 CREATE POLICY "Users can update own profile" ON profiles
   FOR UPDATE TO authenticated USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
 
-CREATE POLICY "Authenticated manage profiles" ON profiles
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Staff manage profiles" ON profiles
+  FOR ALL TO authenticated USING (public.is_staff()) WITH CHECK (public.is_staff());
 
 -- ─── Storage buckets (run if needed) ────────────────────────
 -- INSERT INTO storage.buckets (id, name, public) VALUES ('products', 'products', true);

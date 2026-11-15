@@ -6,7 +6,8 @@
       <slot />
     </main>
     <LayoutAppFooter />
-    <AppSnackbar />
+    <CommonAppSnackbar />
+    <CustomerBagDrawer />
   </div>
 </template>
 

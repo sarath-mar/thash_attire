@@ -1,4 +1,6 @@
 export { AuthService } from './AuthService.js'
+export { CustomerAuthService } from './CustomerAuthService.js'
+export { CustomerOrderService } from './CustomerOrderService.js'
 export { ProductService } from './ProductService.js'
 export { CategoryService } from './CategoryService.js'
 export { StorageService } from './StorageService.js'

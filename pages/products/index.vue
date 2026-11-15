@@ -8,12 +8,8 @@
           <span>Return</span>
         </button>
         <div class="text-center">
-          <span class="eyebrow text-gold mb-2">HAUTE COUTURE CATALOG</span>
-          <h1 class="ta-products-page__title">Our Curated Collections</h1>
-          <div class="divider" />
-          <p class="ta-products-page__subtitle">
-            Explore artisanal silk sarees, bespoke Indo-Western gowns, and bridal couture
-          </p>
+          <span class="eyebrow text-gold mb-2">the edit</span>
+          <h1 class="ta-products-page__title">Shop</h1>
         </div>
       </div>
     </section>

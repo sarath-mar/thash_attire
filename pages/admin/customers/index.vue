@@ -18,6 +18,14 @@
         </NuxtLink>
       </template>
 
+      <template #[`item.phone`]="{ item }">
+        {{ item.phone || '—' }}
+      </template>
+
+      <template #[`item.email`]="{ item }">
+        {{ item.email || '—' }}
+      </template>
+
       <template #[`item.total_amount`]="{ item }">
         <strong>{{ formatCurrency(item.total_amount) }}</strong>
       </template>
@@ -55,6 +63,7 @@ const searchQuery = ref('')
 const headers = [
   { title: 'Customer', key: 'name' },
   { title: 'Phone', key: 'phone' },
+  { title: 'Email', key: 'email' },
   { title: 'Orders', key: 'total_orders' },
   { title: 'Total Purchased', key: 'total_amount' },
   { title: 'Last Order', key: 'last_order_date' },
@@ -65,7 +74,9 @@ const customers = computed(() => {
   if (!searchQuery.value) return allCustomers.value
   const q = searchQuery.value.toLowerCase()
   return allCustomers.value.filter(c =>
-    c.name.toLowerCase().includes(q) || c.phone.includes(q),
+    c.name.toLowerCase().includes(q)
+    || (c.phone || '').toLowerCase().includes(q)
+    || (c.email || '').toLowerCase().includes(q),
   )
 })
 

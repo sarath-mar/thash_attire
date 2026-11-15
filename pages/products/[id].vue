@@ -38,28 +38,23 @@
                 class="ta-product-detail__main-img"
               >
               <span v-if="product.is_featured" class="ta-product-detail__featured-tag">COUTURE EDITION</span>
-            </div>
-
-            <!-- Media Thumbnails -->
-            <div class="ta-product-detail__thumbnails">
               <button
-                v-for="(img, index) in productImages"
-                :key="index"
-                class="ta-product-detail__thumb"
-                :class="{ 'ta-product-detail__thumb--active': !showingVideo && activeImageIndex === index }"
-                @click="selectImage(index)"
+                v-if="productImages.length > 1 && !showingVideo"
+                type="button"
+                class="ta-product-detail__nav ta-product-detail__nav--prev"
+                aria-label="Previous image"
+                @click="stepImage(-1)"
               >
-                <img :src="img" :alt="`${product.name} ${index + 1}`">
+                <v-icon icon="mdi-chevron-left" size="28" />
               </button>
-
               <button
-                v-if="product.videos && product.videos.length"
-                class="ta-product-detail__thumb ta-product-detail__thumb--video"
-                :class="{ 'ta-product-detail__thumb--active': showingVideo }"
-                @click="selectVideo"
+                v-if="productImages.length > 1 && !showingVideo"
+                type="button"
+                class="ta-product-detail__nav ta-product-detail__nav--next"
+                aria-label="Next image"
+                @click="stepImage(1)"
               >
-                <v-icon icon="mdi-play-circle" size="28" color="#d9707a" />
-                <span class="text-micro font-weight-bold d-block mt-1 text-gold">VIDEO DEMO</span>
+                <v-icon icon="mdi-chevron-right" size="28" />
               </button>
             </div>
           </div>
@@ -130,6 +125,13 @@
 
             <!-- WhatsApp Primary Direct Order Action -->
             <div class="ta-product-detail__actions mt-8">
+              <button type="button" class="ta-product-detail__bag-btn" @click="addToBag">
+                <v-icon icon="mdi-shopping-outline" size="22" class="me-2" />
+                Add to bag
+              </button>
+              <button type="button" class="ta-product-detail__checkout-btn" @click="checkoutNow">
+                Checkout
+              </button>
               <a
                 :href="whatsappOrderLink"
                 target="_blank"
@@ -140,8 +142,32 @@
                 <span>Order Now via WhatsApp</span>
               </a>
               <p class="text-caption text-center text-muted mt-2">
-                Click to directly chat with our stylist to confirm availability & dispatch date
+                Add to bag to checkout, or chat with our stylist on WhatsApp. Sign-in is asked only at checkout.
               </p>
+            </div>
+
+            <div class="ta-product-detail__thumbnails">
+              <button
+                v-for="(img, index) in productImages"
+                :key="index"
+                type="button"
+                class="ta-product-detail__thumb"
+                :class="{ 'ta-product-detail__thumb--active': !showingVideo && activeImageIndex === index }"
+                @click="selectImage(index)"
+              >
+                <img :src="img" :alt="`${product.name} ${index + 1}`">
+              </button>
+
+              <button
+                v-if="product.videos && product.videos.length"
+                type="button"
+                class="ta-product-detail__thumb ta-product-detail__thumb--video"
+                :class="{ 'ta-product-detail__thumb--active': showingVideo }"
+                @click="selectVideo"
+              >
+                <v-icon icon="mdi-play-circle" size="28" color="#d9707a" />
+                <span class="text-micro font-weight-bold d-block mt-1 text-gold">VIDEO DEMO</span>
+              </button>
             </div>
 
             <!-- Guarantees & Highlights -->
@@ -240,6 +266,10 @@ import { ProductService } from '~/services/ProductService.js'
 const route = useRoute()
 const config = useRuntimeConfig()
 const { product, loading, fetchProduct } = useProducts()
+const { addItem } = useCart()
+const { openBag } = useBagDrawer()
+const { isAuthenticated } = useCustomerAuth()
+const { success, error: showError } = useSnackbar()
 
 const activeImageIndex = ref(0)
 const showingVideo = ref(false)
@@ -274,6 +304,12 @@ const selectImage = (idx) => {
   activeImageIndex.value = idx
 }
 
+const stepImage = (direction) => {
+  const total = productImages.value.length || 1
+  showingVideo.value = false
+  activeImageIndex.value = (activeImageIndex.value + direction + total) % total
+}
+
 const selectVideo = () => {
   showingVideo.value = true
 }
@@ -297,6 +333,39 @@ const getColorHex = (name) => {
     'Midnight Black': '#121212',
   }
   return map[name] || '#d9707a'
+}
+
+function addToBag() {
+  if (!product.value) return false
+  if (product.value.sizes?.length && !selectedSize.value) {
+    showError('Please choose a size')
+    return false
+  }
+  if (product.value.colors?.length && !selectedColor.value) {
+    showError('Please choose a colour')
+    return false
+  }
+  addItem({
+    productId: product.value.id,
+    name: product.value.name,
+    price: Number(product.value.selling_price) || 0,
+    image: activeImage.value,
+    size: selectedSize.value,
+    color: selectedColor.value,
+    quantity: 1,
+    sku: product.value.sku || '',
+  })
+  success('Added to your bag')
+  return true
+}
+
+async function checkoutNow() {
+  if (!addToBag()) return
+  if (!isAuthenticated.value) {
+    await navigateTo({ path: '/login', query: { redirect: '/?panel=bag' } })
+    return
+  }
+  openBag()
 }
 
 const whatsappOrderLink = computed(() => {
@@ -394,6 +463,31 @@ onMounted(async () => {
     object-fit: cover;
   }
 
+  &__nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 42px;
+    height: 42px;
+    border: 0;
+    border-radius: 50%;
+    background: #fffcf7;
+    color: #231a1d;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(35, 26, 29, 0.16);
+
+    &--prev {
+      left: 12px;
+    }
+
+    &--next {
+      right: 12px;
+    }
+  }
+
   &__featured-tag {
     position: absolute;
     top: var(--spacing-md);
@@ -464,6 +558,40 @@ onMounted(async () => {
     display: flex;
     flex-wrap: wrap;
     gap: var(--spacing-sm);
+  }
+
+  &__checkout-btn {
+    @include button-reset;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    margin-bottom: var(--spacing-sm);
+    padding: 16px 24px;
+    border-radius: var(--radius-full);
+    background: var(--color-accent);
+    color: #fbf4ec;
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+
+  &__bag-btn {
+    @include button-reset;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    margin-bottom: var(--spacing-sm);
+    padding: 16px 24px;
+    border-radius: var(--radius-full);
+    background: var(--color-primary);
+    color: var(--color-text-inverse);
+    font-size: 1.05rem;
+    font-weight: 600;
+
+    &:hover {
+      background: var(--color-primary-light);
+    }
   }
 
   &__order-btn {
