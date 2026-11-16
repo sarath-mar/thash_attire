@@ -1,9 +1,17 @@
 import { DefaultImages } from '~/constants/defaults.js'
+import { StorageBucket } from '~/enums/storageBucket.js'
+import { StorageService } from '~/services/StorageService.js'
 
 export function getImageUrl(path, fallback = DefaultImages.PRODUCT) {
   if (!path) return fallback
-  if (path.startsWith('http') || path.startsWith('/')) return path
-  return path
+  const value = String(path)
+  if (
+    value.startsWith('http')
+    || value.startsWith('/')
+    || value.startsWith('blob:')
+    || value.startsWith('data:')
+  ) return value
+  return StorageService.getPublicUrl(StorageBucket.PRODUCTS, value) || fallback
 }
 
 export function getSupabaseImageUrl(supabase, bucket, path) {

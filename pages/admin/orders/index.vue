@@ -41,19 +41,43 @@
       </template>
 
       <template #[`item.payment_status`]="{ item }">
-        <AdminStatusChip
-          :status="item.payment_status"
-          :label-map="PaymentStatusLabels"
-          :color-map="PaymentStatusColors"
-        />
+        <div class="ta-admin-orders__cell">
+          <AdminStatusChip
+            :status="item.payment_status"
+            :label-map="PaymentStatusLabels"
+            :color-map="PaymentStatusColors"
+          />
+          <v-btn
+            v-if="item.payment_status !== PaymentStatus.PAID"
+            size="x-small"
+            variant="text"
+            color="primary"
+            class="ta-admin-orders__action"
+            @click="openPayment(item)"
+          >
+            Mark paid
+          </v-btn>
+        </div>
       </template>
 
       <template #[`item.order_status`]="{ item }">
-        <AdminStatusChip
-          :status="item.order_status"
-          :label-map="OrderStatusLabels"
-          :color-map="OrderStatusColors"
-        />
+        <div class="ta-admin-orders__cell">
+          <AdminStatusChip
+            :status="item.order_status || item.status"
+            :label-map="OrderStatusLabels"
+            :color-map="OrderStatusColors"
+          />
+          <v-btn
+            v-if="item.order_status !== OrderStatus.COMPLETED && item.order_status !== OrderStatus.CANCELLED"
+            size="x-small"
+            variant="text"
+            color="primary"
+            class="ta-admin-orders__action"
+            @click="openStatus(item)"
+          >
+            Update
+          </v-btn>
+        </div>
       </template>
 
       <template #[`item.order_date`]="{ item }">
@@ -61,7 +85,7 @@
       </template>
 
       <template #[`item.expected_delivery`]="{ item }">
-        {{ item.expected_delivery ? formatDate(item.expected_delivery) : '—' }}
+        {{ expectedDeliveryOf(item) ? formatDate(expectedDeliveryOf(item)) : '—' }}
       </template>
 
       <template #[`item.actions`]="{ item }">
@@ -71,21 +95,30 @@
           </template>
           <v-list density="compact">
             <v-list-item :to="Routes.ADMIN_ORDER_DETAIL(item.id)" prepend-icon="mdi-eye-outline" title="View Details" />
-            <v-list-item v-if="item.order_status !== OrderStatus.COMPLETED" prepend-icon="mdi-check-all" title="Mark Completed" />
+            <v-list-item
+              v-if="item.payment_status !== PaymentStatus.PAID"
+              prepend-icon="mdi-cash-check"
+              title="Record payment"
+              @click="openPayment(item)"
+            />
+            <v-list-item prepend-icon="mdi-progress-check" title="Update status" @click="openStatus(item)" />
           </v-list>
         </v-menu>
       </template>
     </AdminDataTable>
+
+    <AdminOrderPaymentDialog v-model="paymentOpen" :order="activeOrder" @saved="applySaved" />
+    <AdminOrderStatusDialog v-model="statusOpen" :order="activeOrder" @saved="applySaved" @needs-payment="paymentOpen = true" />
   </div>
 </template>
 
 <script setup>
 import { Routes } from '~/constants/routes.js'
 import { PageTitles } from '~/constants/pageTitles.js'
-import { PaymentStatusLabels, PaymentStatusColors } from '~/enums/paymentStatus.js'
+import { PaymentStatus, PaymentStatusLabels, PaymentStatusColors } from '~/enums/paymentStatus.js'
 import { OrderStatusLabels, OrderStatusColors, OrderStatus } from '~/enums/orderStatus.js'
 import { formatCurrency } from '~/helpers/currency.js'
-import { formatDate } from '~/helpers/date.js'
+import { expectedDeliveryOf, formatDate } from '~/helpers/date.js'
 import { SalesService } from '~/services/SalesService.js'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
@@ -94,6 +127,30 @@ useHead({ title: PageTitles.ADMIN_ORDERS })
 const loading = ref(true)
 const allOrders = ref([])
 const searchQuery = ref('')
+const activeOrder = ref(null)
+const paymentOpen = ref(false)
+const statusOpen = ref(false)
+
+function openPayment(order) {
+  activeOrder.value = order
+  paymentOpen.value = true
+}
+
+function openStatus(order) {
+  activeOrder.value = order
+  statusOpen.value = true
+}
+
+function applySaved(updated) {
+  const index = allOrders.value.findIndex(order => order.id === updated.id)
+  if (index === -1) return
+  allOrders.value[index] = {
+    ...allOrders.value[index],
+    ...updated,
+    sale_items: updated.sale_items || allOrders.value[index].sale_items,
+  }
+  activeOrder.value = allOrders.value[index]
+}
 
 const headers = [
   { title: 'Order #', key: 'order_number' },
@@ -113,13 +170,13 @@ const orders = computed(() => {
   return allOrders.value.filter(o =>
     o.order_number.toLowerCase().includes(q) ||
     o.customer_name.toLowerCase().includes(q) ||
-    o.product_name.toLowerCase().includes(q),
+    (o.product_name || '').toLowerCase().includes(q),
   )
 })
 
 onMounted(async () => {
   try {
-    const res = await SalesService.getAll()
+    const res = await SalesService.getAll({ limit: 200 })
     allOrders.value = res.data || []
   } finally {
     loading.value = false
@@ -134,6 +191,20 @@ onMounted(async () => {
     color: var(--color-secondary);
     text-decoration: none;
     &:hover { text-decoration: underline; }
+  }
+
+  &__cell {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  &__action {
+    min-width: 0;
+    padding-inline: 6px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
   }
 }
 </style>

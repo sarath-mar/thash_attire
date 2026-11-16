@@ -44,7 +44,6 @@ const props = defineProps({
 
 const STATUS_CONFIG = [
   { key: 'orders_new', status: OrderStatus.ORDER_RECEIVED, color: '#3b82f6', barColor: '#3b82f6' },
-  { key: 'orders_payment_pending', status: OrderStatus.PAYMENT_PENDING, color: '#f59e0b', barColor: '#f59e0b' },
   { key: 'orders_in_stitching', status: OrderStatus.SENT_TO_STITCHING, color: '#8b5cf6', barColor: '#8b5cf6' },
   { key: 'orders_ready_to_ship', status: OrderStatus.PACKED, color: '#0ea5e9', barColor: '#0ea5e9' },
   { key: 'orders_shipped', status: OrderStatus.HANDED_TO_COURIER, color: '#7e674b', barColor: '#7e674b' },

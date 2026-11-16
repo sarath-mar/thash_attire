@@ -51,7 +51,7 @@
     </AdminFormSection>
 
     <!-- Materials -->
-    <AdminFormSection title="Materials" subtitle="Raw materials required per product">
+    <AdminFormSection title="Materials" subtitle="Product and common materials used for this piece">
       <template #header-actions>
         <v-btn size="small" prepend-icon="mdi-plus" variant="outlined" @click="addMaterialRow">
           Add Material
@@ -75,15 +75,36 @@
             <td>
               <v-autocomplete
                 v-model="row.material_id"
-                :items="productMaterials"
+                :items="materialOptions"
                 item-title="name"
                 item-value="id"
                 variant="outlined"
                 density="compact"
                 hide-details
                 placeholder="Select material"
+                :custom-filter="filterMaterialOption"
                 @update:model-value="onMaterialSelect(row, $event)"
-              />
+              >
+                <template #item="{ props: itemProps, item }">
+                  <v-list-subheader v-if="item.raw?.props?.header">
+                    {{ item.raw.props.header }}
+                  </v-list-subheader>
+                  <v-list-item v-else v-bind="itemProps" :title="item.raw.name">
+                    <template #append>
+                      <v-chip
+                        size="x-small"
+                        variant="tonal"
+                        :color="item.raw.type === MaterialType.COMMON ? 'secondary' : 'primary'"
+                      >
+                        {{ item.raw.type === MaterialType.COMMON ? 'Common' : 'Product' }}
+                      </v-chip>
+                    </template>
+                  </v-list-item>
+                </template>
+              </v-autocomplete>
+              <p v-if="isLimitingMaterial(row)" class="ta-product-form__limit-note">
+                Causes low stock
+              </p>
             </td>
             <td>
               <v-text-field v-model.number="row.quantity" type="number" min="0" step="0.1" variant="outlined" density="compact" hide-details />
@@ -174,10 +195,19 @@
     </AdminFormSection>
 
     <!-- Inventory -->
-    <AdminFormSection title="Inventory" subtitle="Stock levels and thresholds">
+    <AdminFormSection title="Inventory" subtitle="Pieces you can make from the materials above">
       <v-row dense>
         <v-col cols="12" md="4">
-          <v-text-field v-model.number="form.stock" label="Current Stock" type="number" variant="outlined" density="comfortable" :rules="[nonNegative('Current stock')]" />
+          <v-text-field
+            :model-value="calculatedStock"
+            label="Current Stock"
+            type="number"
+            variant="outlined"
+            density="comfortable"
+            readonly
+            hint="Lowest number of pieces the selected materials can cover. Add materials and quantities to calculate it."
+            persistent-hint
+          />
         </v-col>
         <v-col cols="12" md="4">
           <v-text-field v-model.number="form.low_stock_threshold" label="Low Stock Threshold" type="number" variant="outlined" density="comfortable" :rules="[nonNegative('Low stock threshold')]" />
@@ -193,20 +223,24 @@
           />
         </v-col>
       </v-row>
+      <p v-if="lowStockCause" class="ta-product-form__limit-note ta-product-form__limit-note--summary">
+        {{ lowStockCause }}
+      </p>
     </AdminFormSection>
 
     <!-- Publishing -->
     <AdminFormSection title="Publishing" subtitle="Visibility and availability settings">
       <v-row dense>
         <v-col cols="12" md="4">
-          <v-switch v-model="form.is_showcase" label="Showcase Model (Hidden from public)" color="warning" hide-details />
+          <v-switch :model-value="form.is_showcase" label="Showcase Model (Hidden from public)" color="warning" hide-details @update:model-value="setShowcase" />
+          <p v-if="form.is_showcase" class="text-caption text-medium-emphasis mt-1">Hidden from the website, including the lookbook and Trending. Turn this off to publish the dress.</p>
         </v-col>
         <v-col cols="12" md="4">
-          <v-switch v-model="form.is_featured" label="Featured" color="accent" hide-details />
+          <v-switch :model-value="form.is_featured" label="Featured" color="accent" hide-details @update:model-value="setFeatured" />
           <p class="text-caption text-medium-emphasis mt-1">Puts this dress in the homepage lookbook. Up to 3 featured dresses are shown. If none are featured, the lookbook uses the newest published dresses.</p>
         </v-col>
         <v-col cols="12" md="4">
-          <v-switch v-model="form.is_trending" label="Trending" color="accent" hide-details />
+          <v-switch :model-value="form.is_trending" label="Trending" color="accent" hide-details @update:model-value="setTrending" />
           <p class="text-caption text-medium-emphasis mt-1">Puts this dress in the Trending row on the homepage. That row is hidden when no dress is marked trending.</p>
         </v-col>
       </v-row>
@@ -241,7 +275,7 @@ const emit = defineEmits(['submit', 'cancel'])
 const formRef = ref(null)
 const valid = ref(false)
 const categories = ref([])
-const productMaterials = ref([])
+const allMaterials = ref([])
 
 const defaultForm = () => ({
   name: '',
@@ -261,7 +295,7 @@ const defaultForm = () => ({
   low_stock_threshold: 5,
   is_featured: false,
   is_trending: false,
-  is_showcase: true,
+  is_showcase: false,
   initial_sample_created: false,
   createInitialShowcaseSample: true,
   showcaseStitchingCost: 0,
@@ -290,18 +324,107 @@ const costBreakdown = computed(() => [
   { label: 'Other Cost', value: form.other_cost || 0 },
 ])
 
+const materialCapacity = computed(() => {
+  const grouped = new Map()
+  for (const row of form.materials) {
+    if (!row.material_id) continue
+    const qty = Number(row.quantity) || 0
+    if (qty <= 0) continue
+    const current = grouped.get(row.material_id) || {
+      id: row.material_id,
+      name: row.name || 'Material',
+      unit: row.unit || '',
+      qty: 0,
+      available: Number(row.available_stock) || 0,
+    }
+    current.qty += qty
+    current.available = Number(row.available_stock) || 0
+    if (row.name) current.name = row.name
+    if (row.unit) current.unit = row.unit
+    grouped.set(row.material_id, current)
+  }
+  return [...grouped.values()].map(item => ({
+    ...item,
+    pieces: Math.floor(item.available / item.qty),
+  }))
+})
+
+const calculatedStock = computed(() => {
+  if (!materialCapacity.value.length) return 0
+  return Math.min(...materialCapacity.value.map(item => item.pieces))
+})
+
 const stockStatus = computed(() => {
-  if (form.stock === 0) return 'out_of_stock'
-  if (form.stock <= (form.low_stock_threshold || 5)) return 'low_stock'
+  if (calculatedStock.value === 0) return 'out_of_stock'
+  if (calculatedStock.value <= (form.low_stock_threshold || 5)) return 'low_stock'
   return 'in_stock'
 })
+
+const limitingMaterials = computed(() => {
+  if (stockStatus.value === 'in_stock') return []
+  return materialCapacity.value.filter(item => item.pieces === calculatedStock.value)
+})
+
+const lowStockCause = computed(() => {
+  if (stockStatus.value === 'in_stock') return ''
+  if (!limitingMaterials.value.length) return 'Add materials and quantities to calculate stock.'
+  const details = limitingMaterials.value.map((item) => {
+    const unit = item.unit ? ` ${item.unit}` : ''
+    return `${item.name} (${item.available}${unit} available, ${item.qty}${unit} per piece, covers ${item.pieces})`
+  })
+  const label = calculatedStock.value === 0 ? 'Out of stock because of' : 'Low stock because of'
+  return `${label} ${details.join('; ')}.`
+})
+
+function isLimitingMaterial(row) {
+  return limitingMaterials.value.some(item => item.id === row.material_id)
+}
+
+const materialOptions = computed(() => {
+  const product = allMaterials.value.filter(m => m.type !== MaterialType.COMMON)
+  const common = allMaterials.value.filter(m => m.type === MaterialType.COMMON)
+  const options = []
+  if (product.length) {
+    options.push({ props: { header: 'Product materials' } })
+    options.push(...product)
+  }
+  if (common.length) {
+    options.push({ props: { header: 'Common materials' } })
+    options.push(...common)
+  }
+  return options
+})
+
+function setShowcase(value) {
+  form.is_showcase = value
+  if (value) {
+    form.is_featured = false
+    form.is_trending = false
+  }
+}
+
+function setFeatured(value) {
+  form.is_featured = value
+  if (value) form.is_showcase = false
+}
+
+function setTrending(value) {
+  form.is_trending = value
+  if (value) form.is_showcase = false
+}
 
 function addMaterialRow() {
   form.materials.push({ material_id: null, name: '', quantity: 1, unit: '', unit_cost: 0, available_stock: 0 })
 }
 
+function filterMaterialOption(_title, query, item) {
+  if (item?.raw?.props?.header) return !query
+  if (!query) return true
+  return String(item?.raw?.name || '').toLowerCase().includes(String(query).toLowerCase())
+}
+
 function onMaterialSelect(row, materialId) {
-  const mat = productMaterials.value.find(m => m.id === materialId)
+  const mat = allMaterials.value.find(m => m.id === materialId)
   if (mat) {
     row.name = mat.name
     row.unit = mat.unit
@@ -315,6 +438,7 @@ async function handleSubmit() {
   if (!isValid) return
   emit('submit', {
     ...form,
+    stock: calculatedStock.value,
     cost_price: totalCost.value,
     videos: form.video ? [form.video] : [],
     materials: form.materials
@@ -332,7 +456,7 @@ async function handleSubmit() {
 
 onMounted(async () => {
   categories.value = await CategoryService.getAll()
-  productMaterials.value = await MaterialService.getAll('', MaterialType.PRODUCT)
+  allMaterials.value = await MaterialService.getAll()
   if (props.initialData?.materials?.length) {
     form.materials = props.initialData.materials.map(m => ({
       material_id: m.material_id,
@@ -351,10 +475,37 @@ onMounted(async () => {
   &__materials-table {
     font-size: $font-size-sm;
 
+    :deep(table) {
+      border-collapse: separate !important;
+      border-spacing: 0 12px;
+    }
+
     :deep(th) {
       font-size: $font-size-xs !important;
       text-transform: uppercase;
       letter-spacing: $letter-spacing-wider;
+      padding-bottom: 4px;
+    }
+
+    :deep(tbody td),
+    :deep(thead th) {
+      border-bottom: none !important;
+    }
+
+    :deep(tbody td) {
+      padding-top: 10px;
+      padding-bottom: 10px;
+      vertical-align: middle;
+    }
+  }
+
+  &__limit-note {
+    margin: 6px 0 0;
+    font-size: $font-size-xs;
+    color: var(--color-text-secondary);
+
+    &--summary {
+      margin-top: var(--spacing-md);
     }
   }
 

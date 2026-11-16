@@ -20,9 +20,9 @@
           <v-card elevation="0" border rounded="lg" class="ta-admin-product-detail__main-image">
             <v-img :src="activeImage" aspect-ratio="3/4" cover />
           </v-card>
-          <div v-if="product.images?.length > 1" class="ta-admin-product-detail__thumbs">
+          <div v-if="gallery.length > 1" class="ta-admin-product-detail__thumbs">
             <button
-              v-for="(img, idx) in product.images"
+              v-for="(img, idx) in gallery"
               :key="idx"
               class="ta-admin-product-detail__thumb"
               :class="{ 'ta-admin-product-detail__thumb--active': activeImage === img }"
@@ -142,7 +142,7 @@ import { ProductStatus, ProductStatusLabels, ProductStatusColors } from '~/enums
 import { StockStatusLabels, StockStatusColors } from '~/enums/stockStatus.js'
 import { formatCurrency } from '~/helpers/currency.js'
 import { calcMaterialLineCost } from '~/helpers/profit.js'
-import { getProductImageUrl } from '~/helpers/imageUrl.js'
+import { getImageUrl, getProductImageUrl } from '~/helpers/imageUrl.js'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
 
@@ -155,6 +155,7 @@ useHead({ title: PageTitles.ADMIN_PRODUCT_DETAIL })
 const { product, loading, fetchProduct, updateProduct } = useProducts()
 
 const activeImage = ref('')
+const gallery = computed(() => (product.value?.images || []).map(img => getImageUrl(img)).filter(Boolean))
 
 const stockStatus = computed(() => {
   if (!product.value) return 'in_stock'

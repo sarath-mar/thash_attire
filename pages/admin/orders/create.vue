@@ -266,6 +266,7 @@
 import { Routes } from '~/constants/routes.js'
 import { PageTitles } from '~/constants/pageTitles.js'
 import { formatCurrency } from '~/helpers/currency.js'
+import { addDays, toDateInput } from '~/helpers/date.js'
 import { getProductImageUrl } from '~/helpers/imageUrl.js'
 import { PaymentStatus, PaymentStatusLabels, PaymentMethod, PaymentMethodLabels } from '~/enums/paymentStatus.js'
 import { OrderStatus } from '~/enums/orderStatus.js'
@@ -307,10 +308,18 @@ const form = reactive({
   payment_method: PaymentMethod.UPI,
   payment_status: PaymentStatus.PENDING,
   order_status: OrderStatus.ORDER_RECEIVED,
-  order_date: new Date().toISOString().split('T')[0],
-  expected_delivery: '',
+  order_date: toDateInput(new Date()),
+  expected_delivery: addDays(new Date(), 5),
   shipping_address: '',
   notes: '',
+})
+
+watch(() => form.order_date, (value, previous) => {
+  if (!value) return
+  const previousDefault = previous ? addDays(previous, 5) : ''
+  if (!form.expected_delivery || form.expected_delivery === previousDefault) {
+    form.expected_delivery = addDays(value, 5)
+  }
 })
 
 const customerDialog = ref(false)

@@ -51,6 +51,7 @@
 
 <script setup>
 import { AppConfig } from '~/constants/app.js'
+import { getImageUrl } from '~/helpers/imageUrl.js'
 
 const props = defineProps({
   modelValue: {
@@ -80,7 +81,7 @@ const errorMessage = ref('')
 // modelValue is array of File objects or URL strings
 const previewUrls = computed(() => {
   return props.modelValue.map(item => {
-    if (typeof item === 'string') return item
+    if (typeof item === 'string') return getImageUrl(item, '')
     if (item instanceof File) return URL.createObjectURL(item)
     return ''
   }).filter(Boolean)

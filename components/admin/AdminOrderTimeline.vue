@@ -76,7 +76,12 @@ const stepClass = (step, idx) => ({
     &--current .ta-order-timeline__dot {
       background: var(--color-accent);
       border-color: var(--color-accent);
-      box-shadow: 0 0 0 4px rgba(197, 160, 89, 0.25);
+      color: white;
+      box-shadow: 0 0 0 4px var(--color-accent-light);
+    }
+
+    &--current .ta-order-timeline__label {
+      color: var(--color-accent);
     }
 
     &--future .ta-order-timeline__dot {

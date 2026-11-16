@@ -373,16 +373,19 @@ CREATE OR REPLACE FUNCTION create_sale_transaction(
 DECLARE
   v_sale_id UUID;
   v_item JSONB;
-  v_current_stock INTEGER;
+  v_paid BOOLEAN;
 BEGIN
   IF NOT public.is_staff() THEN
     RAISE EXCEPTION 'Access denied';
   END IF;
 
+  v_paid := COALESCE(p_sale->>'payment_status', 'pending') = 'paid';
+
   INSERT INTO sales (
     order_number, customer_id, customer_name, customer_phone, offer_id,
     discount, final_amount, payment_method, payment_status,
-    status, sale_date, order_date, expected_delivery, shipping_address, notes
+    status, sale_date, order_date, expected_delivery, shipping_address, notes,
+    stock_deducted
   ) VALUES (
     p_sale->>'order_number',
     (p_sale->>'customer_id')::UUID,
@@ -401,20 +404,12 @@ BEGIN
       ELSE (p_sale->>'expected_delivery')::TIMESTAMPTZ
     END,
     p_sale->>'shipping_address',
-    p_sale->>'notes'
+    p_sale->>'notes',
+    v_paid
   ) RETURNING id INTO v_sale_id;
 
   FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
   LOOP
-    SELECT stock INTO v_current_stock
-    FROM products
-    WHERE id = (v_item->>'product_id')::UUID
-    FOR UPDATE;
-
-    IF v_current_stock < (v_item->>'quantity')::INTEGER THEN
-      RAISE EXCEPTION 'Insufficient stock for product %', (v_item->>'product_id');
-    END IF;
-
     INSERT INTO sale_items (
       sale_id, offer_id, product_id, product_name, quantity, selling_price, cost_price
     ) VALUES (
@@ -426,12 +421,11 @@ BEGIN
       (v_item->>'selling_price')::NUMERIC,
       COALESCE((v_item->>'cost_price')::NUMERIC, 0)
     );
-
-    UPDATE products
-    SET stock = stock - (v_item->>'quantity')::INTEGER,
-        updated_at = NOW()
-    WHERE id = (v_item->>'product_id')::UUID;
   END LOOP;
+
+  IF v_paid THEN
+    PERFORM public.deduct_sale_stock(v_sale_id);
+  END IF;
 
   RETURN jsonb_build_object('id', v_sale_id);
 END;
@@ -624,7 +618,7 @@ BEGIN
   INSERT INTO sales (
     order_number, customer_id, customer_name, customer_phone,
     discount, final_amount, payment_method, payment_status,
-    status, sale_date, order_date, shipping_address, notes, status_history
+    status, sale_date, order_date, expected_delivery, shipping_address, notes, status_history
   ) VALUES (
     v_order_number,
     v_customer.id,
@@ -637,6 +631,7 @@ BEGIN
     'order_received',
     NOW(),
     NOW(),
+    NOW() + INTERVAL '5 days',
     trim(p_shipping_address),
     NULLIF(trim(COALESCE(p_notes, '')), ''),
     jsonb_build_array(jsonb_build_object('status', 'order_received', 'date', NOW()))
@@ -691,11 +686,6 @@ BEGIN
       COALESCE(v_product.cost_price, 0)
     );
 
-    IF COALESCE(v_product.stock, 0) >= v_qty THEN
-      UPDATE products
-      SET stock = stock - v_qty, updated_at = NOW()
-      WHERE id = v_product.id;
-    END IF;
   END LOOP;
 
   IF array_length(v_names, 1) > 1 THEN

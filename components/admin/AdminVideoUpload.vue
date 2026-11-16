@@ -45,6 +45,8 @@
 
 <script setup>
 import { AppConfig } from '~/constants/app.js'
+import { StorageBucket } from '~/enums/storageBucket.js'
+import { StorageService } from '~/services/StorageService.js'
 
 const props = defineProps({
   modelValue: {
@@ -65,7 +67,11 @@ const errorMessage = ref('')
 
 const previewUrl = computed(() => {
   if (!props.modelValue) return null
-  if (typeof props.modelValue === 'string') return props.modelValue
+  if (typeof props.modelValue === 'string') {
+    const value = props.modelValue
+    if (value.startsWith('http') || value.startsWith('/') || value.startsWith('blob:')) return value
+    return StorageService.getPublicUrl(StorageBucket.PRODUCT_VIDEOS, value) || value
+  }
   if (props.modelValue instanceof File) return URL.createObjectURL(props.modelValue)
   return null
 })

@@ -8,11 +8,21 @@
         :subtitle="`Placed on ${formatDate(order.order_date, { hour: 'numeric', minute: '2-digit' })}`"
       >
         <template #actions>
-          <v-btn variant="outlined" prepend-icon="mdi-printer" class="mr-2">Print Invoice</v-btn>
+          <v-btn
+            v-if="order.payment_status !== PaymentStatus.PAID"
+            variant="outlined"
+            prepend-icon="mdi-cash-check"
+            class="mr-2"
+            @click="paymentOpen = true"
+          >
+            Record payment
+          </v-btn>
+          <v-btn variant="outlined" class="mr-2" @click="statusOpen = true">Update status</v-btn>
           <v-btn
             color="primary"
             variant="flat"
-            :disabled="order.order_status === OrderStatus.COMPLETED || order.order_status === OrderStatus.CANCELLED"
+            :disabled="order.order_status === OrderStatus.COMPLETED || order.order_status === OrderStatus.CANCELLED || advancing"
+            :loading="advancing"
             @click="advanceStatus"
           >
             {{ nextActionLabel }}
@@ -44,6 +54,7 @@
                 </div>
                 <div class="ta-timeline__content">
                   <div class="ta-timeline__label">{{ OrderStatusLabels[step] }}</div>
+                  <div v-if="currentStepIndex === idx" class="ta-timeline__now">Reached</div>
                   <div v-if="getStepDate(step)" class="ta-timeline__date">
                     {{ formatDate(getStepDate(step), { hour: 'numeric', minute: '2-digit' }) }}
                   </div>
@@ -139,16 +150,33 @@
           <!-- Payment -->
           <v-card elevation="0" border rounded="lg" class="pa-5 mb-4">
             <h3 class="text-subtitle-1 font-weight-semibold mb-3">Payment</h3>
-            <div class="mb-3">
+            <div class="d-flex align-center justify-space-between mb-3">
               <AdminStatusChip :status="order.payment_status" :label-map="PaymentStatusLabels" :color-map="PaymentStatusColors" />
+              <v-btn
+                v-if="order.payment_status !== PaymentStatus.PAID"
+                size="small"
+                variant="tonal"
+                color="primary"
+                @click="paymentOpen = true"
+              >
+                Mark paid
+              </v-btn>
             </div>
             <div class="ta-sidebar-info">
               <span class="ta-sidebar-info__label">Method</span>
-              <span class="ta-sidebar-info__value">{{ PaymentMethodLabels[order.payment_method] || order.payment_method }}</span>
+              <span class="ta-sidebar-info__value">{{ PaymentMethodLabels[order.payment_method] || order.payment_method || '—' }}</span>
+            </div>
+            <div v-if="order.payment_app" class="ta-sidebar-info">
+              <span class="ta-sidebar-info__label">UPI app</span>
+              <span class="ta-sidebar-info__value">{{ PaymentAppLabels[order.payment_app] || order.payment_app }}</span>
+            </div>
+            <div v-if="order.transaction_id" class="ta-sidebar-info">
+              <span class="ta-sidebar-info__label">Transaction ID</span>
+              <span class="ta-sidebar-info__value">{{ order.transaction_id }}</span>
             </div>
             <div class="ta-sidebar-info">
               <span class="ta-sidebar-info__label">Total Amount</span>
-              <span class="ta-sidebar-info__value font-weight-semibold">{{ formatCurrency(order.total_amount) }}</span>
+              <span class="ta-sidebar-info__value font-weight-semibold">{{ formatCurrency(order.total_amount || order.final_amount) }}</span>
             </div>
             <div v-if="order.payment_date" class="ta-sidebar-info mt-2">
               <span class="ta-sidebar-info__label">Received On</span>
@@ -168,7 +196,7 @@
             </div>
             <div class="ta-sidebar-info">
               <span class="ta-sidebar-info__label">Expected</span>
-              <span class="ta-sidebar-info__value">{{ order.expected_delivery ? formatDate(order.expected_delivery) : '—' }}</span>
+              <span class="ta-sidebar-info__value">{{ expectedDelivery ? formatDate(expectedDelivery) : '—' }}</span>
             </div>
             <div class="ta-sidebar-info">
               <span class="ta-sidebar-info__label">Actual</span>
@@ -182,13 +210,22 @@
         </div>
       </div>
 
+      <AdminOrderPaymentDialog v-model="paymentOpen" :order="order" @saved="applySaved" />
+      <AdminOrderStatusDialog
+        v-model="statusOpen"
+        :order="order"
+        @saved="applySaved"
+        @needs-payment="paymentOpen = true"
+      />
+
       <v-dialog v-model="dateDialog" max-width="400">
         <v-card>
-          <v-card-title class="pa-4">Edit Order Date</v-card-title>
+          <v-card-title class="pa-4">Edit dates</v-card-title>
           <v-divider />
           <v-card-text class="pa-4">
             <v-form @submit.prevent="saveOrderDate">
-              <CommonAppDatePicker v-model="dateForm.order_date" label="Order Date" variant="outlined" density="comfortable" class="mb-4" />
+              <CommonAppDatePicker v-model="dateForm.order_date" label="Order date" variant="outlined" density="comfortable" class="mb-4" />
+              <CommonAppDatePicker v-model="dateForm.expected_delivery" label="Expected delivery" variant="outlined" density="comfortable" />
             </v-form>
           </v-card-text>
           <v-divider />
@@ -216,40 +253,69 @@
 import { Routes } from '~/constants/routes.js'
 import { PageTitles } from '~/constants/pageTitles.js'
 import { formatCurrency } from '~/helpers/currency.js'
-import { formatDate } from '~/helpers/date.js'
-import { PaymentStatusLabels, PaymentStatusColors, PaymentMethodLabels } from '~/enums/paymentStatus.js'
-import { OrderStatusLabels, OrderStatusColors, OrderStatusIcons, OrderWorkflowSteps, OrderStatus } from '~/enums/orderStatus.js'
+import { addDays, expectedDeliveryOf, formatDate, toDateInput } from '~/helpers/date.js'
+import { PaymentStatus, PaymentStatusLabels, PaymentStatusColors, PaymentMethodLabels, PaymentAppLabels } from '~/enums/paymentStatus.js'
+import { OrderStatusLabels, OrderStatusIcons, OrderWorkflowSteps, OrderStatus } from '~/enums/orderStatus.js'
+import { historyWithStatus, orderStatusOf, progressStep } from '~/helpers/orderWorkflow.js'
 import { SalesService } from '~/services/SalesService.js'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
 useHead({ title: PageTitles.ADMIN_ORDER_DETAIL })
 
 const route = useRoute()
+const { error: showError } = useSnackbar()
 const loading = ref(true)
+const advancing = ref(false)
+const paymentOpen = ref(false)
+const statusOpen = ref(false)
 const order = ref(null)
+
+function applySaved(updated) {
+  order.value = {
+    ...order.value,
+    ...updated,
+    sale_items: updated.sale_items || order.value?.sale_items,
+    offer: updated.offer || order.value?.offer,
+  }
+}
 
 const dateDialog = ref(false)
 const savingDate = ref(false)
-const dateForm = reactive({ order_date: '' })
+const dateForm = reactive({ order_date: '', expected_delivery: '' })
+
+const expectedDelivery = computed(() => expectedDeliveryOf(order.value))
+
+watch(() => dateForm.order_date, (value, previous) => {
+  if (!dateDialog.value || !value || !previous) return
+  if (dateForm.expected_delivery === addDays(previous, 5)) {
+    dateForm.expected_delivery = addDays(value, 5)
+  }
+})
+
+function dateToIso(value) {
+  return value ? new Date(`${value}T12:00:00`).toISOString() : null
+}
 
 const openDateEdit = () => {
-  if (order.value) {
-    const d = order.value.order_date || order.value.sale_date
-    dateForm.order_date = d ? new Date(d).toISOString().split('T')[0] : ''
-    dateDialog.value = true
-  }
+  if (!order.value) return
+  const received = order.value.order_date || order.value.sale_date
+  dateForm.order_date = toDateInput(received)
+  dateForm.expected_delivery = toDateInput(expectedDelivery.value)
+  dateDialog.value = true
 }
 
 const saveOrderDate = async () => {
   savingDate.value = true
   try {
     const updated = await SalesService.update(order.value.id, {
-      order_date: dateForm.order_date ? new Date(dateForm.order_date).toISOString() : null
+      order_date: dateToIso(dateForm.order_date),
+      expected_delivery: dateToIso(dateForm.expected_delivery),
     })
     order.value.order_date = updated.order_date
+    order.value.expected_delivery = updated.expected_delivery
     dateDialog.value = false
   } catch (err) {
-    // Error handling
+    showError(err.message || 'Could not update these dates')
   } finally {
     savingDate.value = false
   }
@@ -257,7 +323,7 @@ const saveOrderDate = async () => {
 
 const currentStepIndex = computed(() => {
   if (!order.value) return 0
-  return OrderWorkflowSteps.indexOf(order.value.order_status)
+  return OrderWorkflowSteps.indexOf(progressStep(orderStatusOf(order.value)))
 })
 
 const getStepDate = (step) => {
@@ -272,7 +338,7 @@ const nextActionLabel = computed(() => {
   
   const nextStep = OrderWorkflowSteps[currentStepIndex.value + 1]
   switch (nextStep) {
-    case OrderStatus.PAYMENT_RECEIVED: return 'Mark Payment Received'
+    case OrderStatus.PAYMENT_RECEIVED: return 'Record Payment'
     case OrderStatus.SENT_TO_STITCHING: return 'Send to Stitching'
     case OrderStatus.STITCHING_COMPLETED: return 'Mark Stitching Completed'
     case OrderStatus.PACKED: return 'Mark as Packed'
@@ -284,20 +350,33 @@ const nextActionLabel = computed(() => {
 })
 
 const advanceStatus = async () => {
-  if (currentStepIndex.value < OrderWorkflowSteps.length - 1) {
-    const nextStep = OrderWorkflowSteps[currentStepIndex.value + 1]
-    // Optimistic update for UI demo
-    order.value.order_status = nextStep
-    if (!order.value.status_history) order.value.status_history = []
-    order.value.status_history.push({ status: nextStep, date: new Date().toISOString() })
+  if (currentStepIndex.value < 0 || currentStepIndex.value >= OrderWorkflowSteps.length - 1) return
+  const nextStep = OrderWorkflowSteps[currentStepIndex.value + 1]
+  if (nextStep === OrderStatus.PAYMENT_RECEIVED && order.value.payment_status !== PaymentStatus.PAID) {
+    paymentOpen.value = true
+    return
+  }
+
+  advancing.value = true
+  try {
+    const updated = await SalesService.updateOrderStatus(
+      order.value.id,
+      nextStep,
+      historyWithStatus(order.value.status_history, nextStep),
+    )
+    applySaved(updated)
+  } catch (err) {
+    showError(err.message || 'Could not update this order')
+  } finally {
+    advancing.value = false
   }
 }
 
 onMounted(async () => {
   try {
-    const res = await SalesService.getAll()
-    const orders = res.data || []
-    order.value = orders.find(o => o.id === route.params.id)
+    order.value = await SalesService.getById(route.params.id)
+  } catch {
+    order.value = null
   } finally {
     loading.value = false
   }
@@ -372,12 +451,15 @@ const profitMargin = computed(() => {
 
     &--active {
       .ta-timeline__icon-wrap {
-        background: var(--color-primary);
+        background: var(--color-accent);
         color: white;
-        border-color: var(--color-primary);
-        box-shadow: 0 0 0 4px rgba(var(--v-theme-primary), 0.2);
+        border-color: var(--color-accent);
+        box-shadow: 0 0 0 4px var(--color-accent-light);
       }
-      .ta-timeline__label { font-weight: $font-weight-bold; color: var(--color-text-primary); }
+      .ta-timeline__label {
+        font-weight: $font-weight-bold;
+        color: var(--color-accent);
+      }
     }
   }
 
@@ -420,6 +502,15 @@ const profitMargin = computed(() => {
     font-size: 10px;
     color: var(--color-text-muted);
     margin-top: 2px;
+  }
+
+  &__now {
+    margin-top: 2px;
+    font-size: 10px;
+    font-weight: $font-weight-semibold;
+    letter-spacing: $letter-spacing-wide;
+    text-transform: uppercase;
+    color: var(--color-accent);
   }
 }
 

@@ -46,7 +46,7 @@ export const OrderStatusIcons = Object.freeze({
   [OrderStatus.STITCHING_COMPLETED]: 'mdi-check-circle-outline',
   [OrderStatus.PACKED]: 'mdi-package-variant-closed',
   [OrderStatus.HANDED_TO_COURIER]: 'mdi-truck-outline',
-  [OrderStatus.DELIVERED]: 'mdi-home-check-outline',
+  [OrderStatus.DELIVERED]: 'mdi-home-outline',
   [OrderStatus.COMPLETED]: 'mdi-check-all',
   [OrderStatus.CANCELLED]: 'mdi-close-circle-outline',
 })
@@ -54,7 +54,6 @@ export const OrderStatusIcons = Object.freeze({
 // The ordered list of active workflow steps (excludes cancelled)
 export const OrderWorkflowSteps = Object.freeze([
   OrderStatus.ORDER_RECEIVED,
-  OrderStatus.PAYMENT_PENDING,
   OrderStatus.PAYMENT_RECEIVED,
   OrderStatus.SENT_TO_STITCHING,
   OrderStatus.STITCHING_COMPLETED,

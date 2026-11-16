@@ -33,3 +33,19 @@ export const PaymentMethodLabels = Object.freeze({
   [PaymentMethod.BANK_TRANSFER]: 'Bank Transfer',
 })
 
+export const PaymentApp = Object.freeze({
+  GOOGLE_PAY: 'google_pay',
+  PHONEPE: 'phonepe',
+  PAYTM: 'paytm',
+  BHIM: 'bhim',
+  OTHER: 'other',
+})
+
+export const PaymentAppLabels = Object.freeze({
+  [PaymentApp.GOOGLE_PAY]: 'Google Pay',
+  [PaymentApp.PHONEPE]: 'PhonePe',
+  [PaymentApp.PAYTM]: 'Paytm',
+  [PaymentApp.BHIM]: 'BHIM',
+  [PaymentApp.OTHER]: 'Other UPI',
+})
+

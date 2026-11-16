@@ -95,7 +95,7 @@ BEGIN
   INSERT INTO sales (
     order_number, customer_id, customer_name, customer_phone,
     discount, final_amount, payment_method, payment_status,
-    status, sale_date, order_date, shipping_address, notes, status_history
+    status, sale_date, order_date, expected_delivery, shipping_address, notes, status_history
   ) VALUES (
     v_order_number,
     v_customer.id,
@@ -108,6 +108,7 @@ BEGIN
     'order_received',
     NOW(),
     NOW(),
+    NOW() + INTERVAL '5 days',
     trim(p_shipping_address),
     NULLIF(trim(COALESCE(p_notes, '')), ''),
     jsonb_build_array(jsonb_build_object('status', 'order_received', 'date', NOW()))
@@ -162,11 +163,6 @@ BEGIN
       COALESCE(v_product.cost_price, 0)
     );
 
-    IF COALESCE(v_product.stock, 0) >= v_qty THEN
-      UPDATE products
-      SET stock = stock - v_qty, updated_at = NOW()
-      WHERE id = v_product.id;
-    END IF;
   END LOOP;
 
   IF p_offer_id IS NOT NULL THEN

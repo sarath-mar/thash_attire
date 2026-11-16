@@ -98,7 +98,7 @@
         <AdminStatCard
           label="Delivered"
           :value="stats.orders_delivered"
-          icon="mdi-home-check-outline"
+          icon="mdi-home-outline"
           icon-color="#2d6a4f"
           icon-bg="rgba(45,106,79,0.12)"
           :loading="loading"
@@ -243,24 +243,24 @@ const loading = computed(() => loadingSummary.value || loadingRecentSales.value 
 const stats = computed(() => {
   const s = summary.value || {}
   return {
-    today_revenue: 0, // Not explicitly calculated in simplified DashboardService
-    month_revenue: s.totalRevenue || 0,
+    today_revenue: s.todayRevenue || 0,
+    month_revenue: s.monthRevenue || 0,
     total_revenue: s.totalRevenue || 0,
     total_orders: s.totalSales || 0,
-    orders_new: 0,
-    orders_payment_pending: 0,
-    orders_in_stitching: 0,
-    orders_ready_to_ship: 0,
-    orders_shipped: 0,
-    orders_delivered: 0,
-    month_product_cost: 0,
-    month_revenue_calc: s.totalRevenue || 0,
-    month_gross_profit: s.estimatedProfit || 0,
-    month_profit_margin: s.totalRevenue ? Math.round((s.estimatedProfit / s.totalRevenue) * 100) : 0,
+    orders_new: s.ordersNew || 0,
+    orders_payment_pending: s.ordersPaymentPending || 0,
+    orders_in_stitching: s.ordersInStitching || 0,
+    orders_ready_to_ship: s.ordersReadyToShip || 0,
+    orders_shipped: s.ordersShipped || 0,
+    orders_delivered: s.ordersDelivered || 0,
+    month_product_cost: s.monthProductCost || 0,
+    month_revenue_calc: s.monthRevenue || 0,
+    month_gross_profit: s.monthGrossProfit || 0,
+    month_profit_margin: s.monthProfitMargin || 0,
     total_material_value: 0,
     low_stock_materials: 0,
     out_of_stock_materials: 0,
-    chart_data: { labels: [], datasets: [] },
+    chart_data: s.chartData || [],
     recent_orders: recentSales.value || [],
     low_stock_materials_list: lowStockProducts.value || []
   }

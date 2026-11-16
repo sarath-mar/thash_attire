@@ -115,9 +115,9 @@ const activePeriod = computed(() =>
 
 const chartPoints = computed(() => {
   const days = activePeriod.value.days
-  const source = props.chartData.length
+  const source = Array.isArray(props.chartData) && props.chartData.length
     ? props.chartData
-    : generateFallbackData(days)
+    : emptySeries(days)
 
   const sliced = source.slice(-Math.min(days, source.length))
 
@@ -147,18 +147,18 @@ const maxValue = computed(() => {
 
 const barHeight = (value) => `${Math.max(4, (value / maxValue.value) * 100)}%`
 
-function generateFallbackData(days) {
+function emptySeries(days) {
   const result = []
   const today = new Date()
   for (let i = days - 1; i >= 0; i--) {
     const date = new Date(today)
     date.setDate(date.getDate() - i)
-    const revenue = Math.round(8000 + Math.random() * 35000)
-    const cost = Math.round(revenue * (0.45 + Math.random() * 0.1))
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
     result.push({
-      date: date.toISOString().split('T')[0],
-      revenue,
-      cost,
+      date: `${date.getFullYear()}-${month}-${day}`,
+      revenue: 0,
+      cost: 0,
     })
   }
   return result

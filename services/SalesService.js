@@ -1,5 +1,6 @@
 import { getSupabaseClient, handleSupabaseError } from './supabaseClient.js'
 import { PaymentStatus, SaleStatus } from '~/enums/index.js'
+import { presentSale } from '~/helpers/orderWorkflow.js'
 
 export const SalesService = {
   async getAll(filters = {}) {
@@ -23,8 +24,8 @@ export const SalesService = {
 
     const { data, error, count } = await query
     if (error) throw new Error(handleSupabaseError(error))
-    
-    return { data: data || [], total: count || 0 }
+
+    return { data: (data || []).map(presentSale), total: count || 0 }
   },
 
   async getById(id) {
@@ -38,7 +39,7 @@ export const SalesService = {
       .single()
 
     if (error) throw new Error(handleSupabaseError(error))
-    return data
+    return presentSale(data)
   },
 
   async create(sale, items) {
@@ -101,7 +102,25 @@ export const SalesService = {
       .single()
 
     if (error) throw new Error(handleSupabaseError(error))
-    return data
+    return presentSale(data)
+  },
+
+  async recordPayment(id, payload) {
+    const supabase = getSupabaseClient()
+    if (!supabase) throw new Error('Supabase client not initialized')
+
+    const { data, error } = await supabase.rpc('record_sale_payment', {
+      p_sale_id: id,
+      p_method: payload.method,
+      p_payment_date: payload.date,
+      p_transaction_id: payload.transactionId || null,
+      p_payment_app: payload.method === 'upi' ? payload.paymentApp : null,
+      p_status: payload.status,
+      p_status_history: payload.statusHistory,
+    })
+
+    if (error) throw new Error(handleSupabaseError(error))
+    return this.getById(data?.id || id)
   },
 
   async updatePaymentStatus(id, paymentStatus) {
@@ -120,12 +139,15 @@ export const SalesService = {
     const supabase = getSupabaseClient()
     if (!supabase) throw new Error('Supabase client not initialized')
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('sales')
-      .update({ status: status, status_history: statusHistory })
+      .update({ status, status_history: statusHistory })
       .eq('id', id)
+      .select()
+      .single()
 
     if (error) throw new Error(handleSupabaseError(error))
+    return presentSale(data)
   },
 
   async delete(id) {

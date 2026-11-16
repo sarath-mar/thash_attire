@@ -1,5 +1,7 @@
 import { getSupabaseClient, handleSupabaseError } from './supabaseClient.js'
+import { StorageService } from './StorageService.js'
 import { ProductStatus } from '~/enums/productStatus.js'
+import { StorageBucket } from '~/enums/storageBucket.js'
 import { PaginationDefaults } from '~/constants/app.js'
 
 const PRODUCT_UI_ONLY_FIELDS = [
@@ -68,6 +70,30 @@ function buildProductPayload(product) {
   if (payload.stock != null) payload.stock = Number(payload.stock) || 0
 
   return payload
+}
+
+function safeFileName(name) {
+  return String(name || 'file').replace(/[^a-zA-Z0-9.-]/g, '_')
+}
+
+async function storedMediaUrl(item, bucket, folder) {
+  if (typeof File !== 'undefined' && item instanceof File) {
+    const path = `${folder}/${Date.now()}-${safeFileName(item.name)}`
+    const uploaded = await StorageService.upload(bucket, path, item)
+    return StorageService.getPublicUrl(bucket, uploaded?.path || path)
+  }
+  if (typeof item === 'string' && item.trim()) return item.trim()
+  return ''
+}
+
+async function storedMediaList(items, bucket, folder) {
+  const list = Array.isArray(items) ? items : []
+  const urls = []
+  for (const item of list) {
+    const url = await storedMediaUrl(item, bucket, folder)
+    if (url) urls.push(url)
+  }
+  return urls
 }
 
 function materialsForRpc(materials = []) {
@@ -178,6 +204,12 @@ export const ProductService = {
     const createSample = !!product.createInitialShowcaseSample
     const showcaseStitchingCost = Number(product.showcaseStitchingCost) || 0
     const productData = buildProductPayload(product)
+    productData.images = await storedMediaList(product.images, StorageBucket.PRODUCTS, 'products')
+    productData.videos = await storedMediaList(
+      product.video ? [product.video] : product.videos,
+      StorageBucket.PRODUCT_VIDEOS,
+      'videos',
+    )
 
     const { data: productId, error } = await supabase.rpc('create_product_with_sample', {
       p_product: productData,
@@ -197,6 +229,14 @@ export const ProductService = {
 
     const materials = product.materials
     const productData = buildProductPayload(product)
+    if (Array.isArray(product.images) || product.video !== undefined || Array.isArray(product.videos)) {
+      productData.images = await storedMediaList(product.images, StorageBucket.PRODUCTS, 'products')
+      productData.videos = await storedMediaList(
+        product.video ? [product.video] : product.videos,
+        StorageBucket.PRODUCT_VIDEOS,
+        'videos',
+      )
+    }
 
     // Status-only updates (and similar) may omit materials — don't wipe them
     const shouldSyncMaterials = Array.isArray(materials)

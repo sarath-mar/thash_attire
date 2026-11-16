@@ -128,8 +128,8 @@ onMounted(async () => {
     customer.value = await CustomerService.getById(route.params.id)
     if (customer.value) {
       // Fetch orders for this customer. For now using SalesService.
-      const allOrders = await SalesService.getAll()
-      orders.value = allOrders.filter(o => o.customer_id === customer.value.id)
+      const allOrders = await SalesService.getAll({ limit: 200 })
+      orders.value = (allOrders.data || []).filter(o => o.customer_id === customer.value.id)
     }
   } finally {
     loading.value = false
