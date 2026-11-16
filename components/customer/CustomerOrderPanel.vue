@@ -135,7 +135,6 @@ function download(order) {
   if (!isPaid(order)) return
   downloadOrderPdf(order, {
     placed: placedLabel(order),
-    status: orderStatusLabel(order.status),
     payment: paymentLabel(order),
     expected: order.expected_delivery ? formatDate(order.expected_delivery) : '',
   })
