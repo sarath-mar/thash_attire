@@ -167,10 +167,10 @@ const confirmDelete = (item) => { productToDelete.value = item; deleteDialog.val
 
 const handleDelete = async () => {
   deleting.value = true
-  await deleteProduct(productToDelete.value.id)
+  const deleted = await deleteProduct(productToDelete.value.id)
   deleting.value = false
   deleteDialog.value = false
-  loadProducts()
+  if (deleted) loadProducts()
 }
 
 const duplicateProduct = (item) => {

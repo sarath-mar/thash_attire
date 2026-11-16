@@ -14,7 +14,7 @@
             type="button"
             class="ta-status-picker__step"
             :class="stepClass(step)"
-            @click="picked = step"
+            @click="pickStep(step)"
           >
             <span class="ta-status-picker__icon">
               <v-icon :icon="iconFor(step)" size="16" />
@@ -38,7 +38,7 @@
 
 <script setup>
 import { OrderStatus, OrderStatusIcons, OrderStatusLabels, OrderWorkflowSteps } from '~/enums/orderStatus.js'
-import { historyWithStatus, orderStatusOf, progressStep } from '~/helpers/orderWorkflow.js'
+import { historyWithStatus, orderStatusOf, progressStep, statusMoveBlockMessage } from '~/helpers/orderWorkflow.js'
 import { PaymentStatus } from '~/enums/paymentStatus.js'
 import { SalesService } from '~/services/SalesService.js'
 
@@ -65,6 +65,19 @@ watch(() => props.modelValue, (isOpen) => {
   if (isOpen) picked.value = current.value
 })
 
+function isLocked(step) {
+  return Boolean(statusMoveBlockMessage(current.value, step))
+}
+
+function pickStep(step) {
+  const message = statusMoveBlockMessage(current.value, step)
+  if (message) {
+    showError(message)
+    return
+  }
+  picked.value = step
+}
+
 function stepClass(step) {
   const index = OrderWorkflowSteps.indexOf(step)
   const currentIndex = OrderWorkflowSteps.indexOf(current.value)
@@ -72,6 +85,7 @@ function stepClass(step) {
     'ta-status-picker__step--current': step === current.value,
     'ta-status-picker__step--done': index > -1 && currentIndex > index,
     'ta-status-picker__step--selected': step === picked.value,
+    'ta-status-picker__step--locked': isLocked(step),
   }
 }
 
@@ -83,7 +97,7 @@ function iconFor(step) {
 }
 
 async function save() {
-  if (!props.order || !picked.value || picked.value === current.value) return
+  if (!props.order || !picked.value || picked.value === current.value || isLocked(picked.value)) return
   if (picked.value === OrderStatus.PAYMENT_RECEIVED && props.order.payment_status !== PaymentStatus.PAID) {
     open.value = false
     emit('needs-payment')
@@ -147,6 +161,11 @@ async function save() {
 
     &--selected {
       box-shadow: inset 0 0 0 1px var(--color-accent);
+    }
+
+    &--locked {
+      cursor: not-allowed;
+      opacity: 0.55;
     }
   }
 

@@ -1,4 +1,4 @@
-import { OrderStatus, OrderWorkflowSteps } from '~/enums/orderStatus.js'
+import { OrderStatus, OrderStatusLabels, OrderWorkflowSteps } from '~/enums/orderStatus.js'
 
 export const OrderNextActions = Object.freeze({
   [OrderStatus.ORDER_RECEIVED]: { status: OrderStatus.PAYMENT_RECEIVED, label: 'Record Payment', icon: 'mdi-cash-check' },
@@ -22,6 +22,19 @@ export function orderStatusOf(order) {
 export function progressStep(status) {
   if (status === OrderStatus.PAYMENT_PENDING) return OrderStatus.ORDER_RECEIVED
   return status
+}
+
+export function statusMoveBlockMessage(currentStatus, nextStatus) {
+  if (nextStatus === OrderStatus.CANCELLED) return ''
+
+  const currentIndex = OrderWorkflowSteps.indexOf(progressStep(currentStatus))
+  const nextIndex = OrderWorkflowSteps.indexOf(nextStatus)
+  const paidIndex = OrderWorkflowSteps.indexOf(OrderStatus.PAYMENT_RECEIVED)
+  if (currentIndex < 0 || nextIndex < 0 || nextIndex >= currentIndex) return ''
+  if (currentIndex < paidIndex || nextIndex > paidIndex) return ''
+
+  const label = OrderStatusLabels[nextStatus] || 'that step'
+  return `This order can't go back to ${label}. Payment is already recorded, and the stock stays on this order.`
 }
 
 export function statusAfterPayment(currentStatus) {

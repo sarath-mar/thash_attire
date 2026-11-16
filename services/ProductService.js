@@ -96,6 +96,45 @@ async function storedMediaList(items, bucket, folder) {
   return urls
 }
 
+async function countRelatedRows(supabase, table, column, id) {
+  const { count, error } = await supabase
+    .from(table)
+    .select('id', { count: 'exact', head: true })
+    .eq(column, id)
+
+  if (error) throw new Error(handleSupabaseError(error))
+  return count || 0
+}
+
+function productDeleteBlockMessage(orders, offers) {
+  if (!orders && !offers) return ''
+
+  const parts = []
+  if (orders) {
+    parts.push(orders === 1
+      ? 'It is on an order, and that order still uses it when stock is reduced or restored.'
+      : `It is on ${orders} orders, and those orders still use it when stock is reduced or restored.`)
+  }
+  if (offers) {
+    parts.push(offers === 1
+      ? 'It is included in an offer. Remove it from that offer first.'
+      : `It is included in ${offers} offers. Remove it from those offers first.`)
+  }
+
+  return `This product can't be deleted. ${parts.join(' ')}`
+}
+
+function productDeleteErrorMessage(error) {
+  const raw = String(error?.message || '')
+  if (/sale_items/i.test(raw)) {
+    return "This product can't be deleted. It is on an order, and that order still uses it when stock is reduced or restored."
+  }
+  if (/offer_items/i.test(raw)) {
+    return "This product can't be deleted. It is included in an offer. Remove it from that offer first."
+  }
+  return handleSupabaseError(error)
+}
+
 function materialsForRpc(materials = []) {
   return materials
     .filter((m) => m.material_id)
@@ -258,9 +297,18 @@ export const ProductService = {
   async delete(id) {
     const supabase = getSupabaseClient()
     if (!supabase) throw new Error('Supabase client not initialized')
+    if (!id) throw new Error('Select a product before deleting.')
+
+    const [orders, offers] = await Promise.all([
+      countRelatedRows(supabase, 'sale_items', 'product_id', id),
+      countRelatedRows(supabase, 'offer_items', 'product_id', id),
+    ])
+
+    const blockMessage = productDeleteBlockMessage(orders, offers)
+    if (blockMessage) throw new Error(blockMessage)
 
     const { error } = await supabase.from('products').delete().eq('id', id)
-    if (error) throw new Error(handleSupabaseError(error))
+    if (error) throw new Error(productDeleteErrorMessage(error))
   },
 
   async getFeatured(limit = 8) {

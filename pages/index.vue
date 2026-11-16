@@ -373,38 +373,13 @@
             <button type="button" aria-label="Close" @click="closePanel">×</button>
           </header>
 
-          <div v-if="panel === 'orders'" class="ed-orders">
-            <template v-if="!isAuthenticated">
-              <p>Sign in to see current and past orders.</p>
-              <NuxtLink class="ed-btn ed-btn--rose" :to="{ path: '/login', query: { redirect: '/?panel=orders' } }">Sign in</NuxtLink>
-            </template>
-            <template v-else-if="ordersLoading">
-              <p class="ed-drawer__note">Loading your orders…</p>
-            </template>
-            <template v-else>
-              <p v-if="ordersError" class="ed-drawer__note">{{ ordersError }}</p>
-              <h3>Current</h3>
-              <p v-if="!currentOrders.length" class="ed-drawer__note">No orders in progress.</p>
-              <ul v-else>
-                <li v-for="order in currentOrders" :key="order.id">
-                  <span>{{ order.order_number }}</span>
-                  <span>{{ orderLabel(order) }}</span>
-                  <b>{{ orderStatusLabel(order.status) }}</b>
-                  <strong>{{ formatCurrency(order.final_amount) }}</strong>
-                </li>
-              </ul>
-              <h3>Past</h3>
-              <p v-if="!pastOrders.length" class="ed-drawer__note">No past orders yet.</p>
-              <ul v-else>
-                <li v-for="order in pastOrders" :key="order.id">
-                  <span>{{ order.order_number }}</span>
-                  <span>{{ orderLabel(order) }}</span>
-                  <b>{{ orderStatusLabel(order.status) }}</b>
-                  <strong>{{ formatCurrency(order.final_amount) }}</strong>
-                </li>
-              </ul>
-            </template>
-          </div>
+          <CustomerOrderPanel
+            v-if="panel === 'orders'"
+            :orders="orders"
+            :loading="ordersLoading"
+            :error="ordersError"
+            :authenticated="isAuthenticated"
+          />
 
           <CustomerHomeAccount v-else-if="panel === 'profile'" />
           <CustomerCheckout v-else-if="panel === 'bag'" />
@@ -427,7 +402,6 @@ import { ReviewService } from '~/services/ReviewService.js'
 import { StorageService } from '~/services/StorageService.js'
 import { StorageBucket } from '~/enums/storageBucket.js'
 import { CustomerOrderService } from '~/services/CustomerOrderService.js'
-import { OrderStatusLabels } from '~/enums/orderStatus.js'
 
 definePageMeta({ layout: 'blank' })
 
@@ -668,12 +642,6 @@ const activeLookImage = computed(() => activeLookImages.value[imageIndex.value] 
 
 const lookPalette = computed(() => palettes[(lookIndex.value + collectionIndex.value) % palettes.length])
 
-const pastStatuses = new Set(['delivered', 'completed', 'cancelled'])
-
-const currentOrders = computed(() => orders.value.filter(order => !pastStatuses.has(order.status)))
-
-const pastOrders = computed(() => orders.value.filter(order => pastStatuses.has(order.status)))
-
 const searchResults = computed(() => {
   const query = searchQuery.value.trim().toLowerCase()
   if (!query) return []
@@ -767,14 +735,6 @@ function chooseSearch(item) {
   searchQuery.value = ''
   searchExpanded.value = false
   openProduct(item, 'all')
-}
-
-function orderLabel(order) {
-  return order.product_name || order.sale_items?.[0]?.product_name || 'Custom order'
-}
-
-function orderStatusLabel(status) {
-  return OrderStatusLabels[status] || 'In progress'
 }
 
 async function loadOrders() {

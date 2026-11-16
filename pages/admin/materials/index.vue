@@ -159,7 +159,7 @@ const saveMaterial = async () => {
 const confirmDelete = (mat) => { materialToDelete.value = mat; deleteDialog.value = true }
 const handleDelete = async () => {
   deleting.value = true
-  await deleteMaterial(materialToDelete.value.id)
+  const deleted = await deleteMaterial(materialToDelete.value.id)
   deleting.value = false
   deleteDialog.value = false
 }

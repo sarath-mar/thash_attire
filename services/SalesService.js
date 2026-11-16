@@ -1,6 +1,6 @@
 import { getSupabaseClient, handleSupabaseError } from './supabaseClient.js'
 import { PaymentStatus, SaleStatus } from '~/enums/index.js'
-import { presentSale } from '~/helpers/orderWorkflow.js'
+import { orderStatusOf, presentSale, statusMoveBlockMessage } from '~/helpers/orderWorkflow.js'
 
 export const SalesService = {
   async getAll(filters = {}) {
@@ -138,6 +138,10 @@ export const SalesService = {
   async updateOrderStatus(id, status, statusHistory) {
     const supabase = getSupabaseClient()
     if (!supabase) throw new Error('Supabase client not initialized')
+
+    const existing = await this.getById(id)
+    const blockMessage = statusMoveBlockMessage(orderStatusOf(existing), status)
+    if (blockMessage) throw new Error(blockMessage)
 
     const { data, error } = await supabase
       .from('sales')

@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS materials (
 CREATE TABLE IF NOT EXISTS product_materials (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   product_id UUID REFERENCES products(id) ON DELETE CASCADE,
-  material_id UUID REFERENCES materials(id) ON DELETE CASCADE,
+  material_id UUID REFERENCES materials(id) ON DELETE RESTRICT,
   quantity_required NUMERIC(10, 2) NOT NULL DEFAULT 1,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (product_id, material_id)
@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS product_materials (
 -- ─── Material Purchases ─────────────────────────────────────
 CREATE TABLE IF NOT EXISTS material_purchases (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  material_id UUID REFERENCES materials(id) ON DELETE CASCADE,
+  material_id UUID REFERENCES materials(id) ON DELETE RESTRICT,
   quantity NUMERIC(10, 2) NOT NULL DEFAULT 0,
   unit TEXT,
   unit_cost NUMERIC(10, 2) NOT NULL DEFAULT 0,
@@ -115,7 +115,7 @@ END $$;
 
 CREATE TABLE IF NOT EXISTS material_stock_movements (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  material_id UUID REFERENCES materials(id) ON DELETE CASCADE,
+  material_id UUID REFERENCES materials(id) ON DELETE RESTRICT,
   quantity NUMERIC(10, 2) NOT NULL,
   reason movement_reason NOT NULL,
   reference_id UUID,
