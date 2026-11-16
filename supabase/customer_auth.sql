@@ -86,6 +86,32 @@ CREATE TRIGGER mark_storefront_customer
   BEFORE INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.mark_storefront_customer();
 
+-- Auth user creation fails with "Database error creating new user" unless
+-- this trigger can insert the profile row.
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, role)
+  VALUES (NEW.id, COALESCE(NEW.email, ''), 'customer')
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+GRANT USAGE ON SCHEMA public TO supabase_auth_admin;
+GRANT INSERT, SELECT ON TABLE public.profiles TO supabase_auth_admin;
+GRANT EXECUTE ON FUNCTION public.handle_new_user() TO supabase_auth_admin;
+GRANT EXECUTE ON FUNCTION public.mark_storefront_customer() TO supabase_auth_admin;
+
 CREATE OR REPLACE FUNCTION public.prevent_profile_role_escalation()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -556,13 +582,16 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.place_customer_order(JSONB, TEXT, TEXT, TEXT, TEXT, TEXT);
+
 CREATE OR REPLACE FUNCTION public.place_customer_order(
   p_items JSONB,
   p_shipping_address TEXT,
   p_payment_method TEXT,
   p_name TEXT DEFAULT NULL,
   p_phone TEXT DEFAULT NULL,
-  p_notes TEXT DEFAULT NULL
+  p_notes TEXT DEFAULT NULL,
+  p_offer_id UUID DEFAULT NULL
 ) RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -585,6 +614,10 @@ DECLARE
   v_color TEXT;
   v_label TEXT;
   v_summary TEXT;
+  v_offer offers%ROWTYPE;
+  v_discount NUMERIC := 0;
+  v_expected INTEGER := 0;
+  v_got INTEGER := 0;
 BEGIN
   IF v_uid IS NULL THEN
     RAISE EXCEPTION 'Please sign in to place an order';
@@ -688,6 +721,43 @@ BEGIN
 
   END LOOP;
 
+  IF p_offer_id IS NOT NULL THEN
+    SELECT * INTO v_offer
+    FROM offers
+    WHERE id = p_offer_id
+      AND status = 'active'
+      AND (start_date IS NULL OR start_date <= NOW())
+      AND (end_date IS NULL OR end_date >= NOW());
+
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'This offer is no longer available';
+    END IF;
+
+    SELECT COUNT(*) INTO v_expected FROM offer_items WHERE offer_id = p_offer_id;
+    SELECT COUNT(*) INTO v_got FROM jsonb_array_elements(p_items);
+
+    IF v_expected <> v_got OR v_expected = 0 THEN
+      RAISE EXCEPTION 'This offer is no longer available';
+    END IF;
+
+    IF EXISTS (
+      SELECT 1
+      FROM offer_items oi
+      WHERE oi.offer_id = p_offer_id
+        AND NOT EXISTS (
+          SELECT 1
+          FROM jsonb_array_elements(p_items) AS cart
+          WHERE (cart->>'product_id')::uuid = oi.product_id
+            AND COALESCE((cart->>'quantity')::int, 0) = oi.quantity
+        )
+    ) THEN
+      RAISE EXCEPTION 'This offer is no longer available';
+    END IF;
+
+    v_discount := GREATEST(v_final - COALESCE(v_offer.offer_price, 0), 0);
+    v_final := COALESCE(v_offer.offer_price, v_final);
+  END IF;
+
   IF array_length(v_names, 1) > 1 THEN
     v_summary := v_names[1] || ' + ' || (array_length(v_names, 1) - 1)::TEXT || ' more';
   ELSE
@@ -700,6 +770,8 @@ BEGIN
     product_name = v_summary,
     quantity = v_total_qty,
     selling_price = v_first_price,
+    discount = v_discount,
+    offer_id = p_offer_id,
     final_amount = v_final,
     updated_at = NOW()
   WHERE id = v_sale_id;
@@ -721,8 +793,8 @@ $$;
 
 REVOKE ALL ON FUNCTION public.upsert_my_customer_profile(TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.upsert_my_customer_profile(TEXT, TEXT, TEXT, TEXT) TO authenticated;
-REVOKE ALL ON FUNCTION public.place_customer_order(JSONB, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.place_customer_order(JSONB, TEXT, TEXT, TEXT, TEXT, TEXT) TO authenticated;
+REVOKE ALL ON FUNCTION public.place_customer_order(JSONB, TEXT, TEXT, TEXT, TEXT, TEXT, UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.place_customer_order(JSONB, TEXT, TEXT, TEXT, TEXT, TEXT, UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated, service_role;
 
 DROP POLICY IF EXISTS "Authenticated full access categories" ON categories;

@@ -42,7 +42,19 @@ export const DashboardService = {
     const supabase = getSupabaseClient()
     if (!supabase) throw new Error('Supabase client not initialized')
 
-    const [productsRes, customersRes, salesRes, pendingRes, expensesRes] = await Promise.all([
+    const workflowStatuses = [
+      OrderStatus.ORDER_RECEIVED,
+      OrderStatus.PAYMENT_PENDING,
+      OrderStatus.PAYMENT_RECEIVED,
+      OrderStatus.SENT_TO_STITCHING,
+      OrderStatus.STITCHING_COMPLETED,
+      OrderStatus.PACKED,
+      OrderStatus.HANDED_TO_COURIER,
+      OrderStatus.DELIVERED,
+      OrderStatus.COMPLETED,
+    ]
+
+    const [productsRes, customersRes, salesRes, pendingRes, expensesRes, materialsRes, ...statusResults] = await Promise.all([
       supabase.from('products').select('id, stock', { count: 'exact' }),
       supabase.from('customers').select('id', { count: 'exact' }),
       supabase
@@ -55,10 +67,17 @@ export const DashboardService = {
         .in('payment_status', [PaymentStatus.PENDING, PaymentStatus.PARTIAL])
         .neq('status', OrderStatus.CANCELLED),
       supabase.from('expenses').select('amount'),
+      supabase.from('materials').select('id, name, stock, unit, min_stock_level, avg_unit_cost'),
+      ...workflowStatuses.map(status => (
+        supabase.from('sales').select('id', { count: 'exact', head: true }).eq('status', status)
+      )),
     ])
 
     if (salesRes.error) throw new Error(handleSupabaseError(salesRes.error))
     if (pendingRes.error) throw new Error(handleSupabaseError(pendingRes.error))
+    if (materialsRes.error) throw new Error(handleSupabaseError(materialsRes.error))
+    const failedStatus = statusResults.find(result => result.error)
+    if (failedStatus) throw new Error(handleSupabaseError(failedStatus.error))
 
     const paidSales = salesRes.data || []
     const now = new Date()
@@ -68,16 +87,9 @@ export const DashboardService = {
     let monthRevenue = 0
     let monthProductCost = 0
     let totalRevenue = 0
-    const statusCounts = {
-      [OrderStatus.ORDER_RECEIVED]: 0,
-      [OrderStatus.PAYMENT_RECEIVED]: 0,
-      [OrderStatus.SENT_TO_STITCHING]: 0,
-      [OrderStatus.STITCHING_COMPLETED]: 0,
-      [OrderStatus.PACKED]: 0,
-      [OrderStatus.HANDED_TO_COURIER]: 0,
-      [OrderStatus.DELIVERED]: 0,
-      [OrderStatus.COMPLETED]: 0,
-    }
+    const statusCounts = Object.fromEntries(
+      workflowStatuses.map((status, index) => [status, statusResults[index].count || 0]),
+    )
 
     for (const sale of paidSales) {
       const amount = Number(sale.final_amount) || 0
@@ -89,8 +101,19 @@ export const DashboardService = {
         monthRevenue += amount
         monthProductCost += cost
       }
-      if (statusCounts[sale.status] !== undefined) statusCounts[sale.status] += 1
     }
+
+    const materials = (materialsRes.data || []).map(material => ({
+      id: material.id,
+      name: material.name,
+      unit: material.unit,
+      current_stock: Number(material.stock) || 0,
+      min_stock_level: Number(material.min_stock_level) || 0,
+      total_inventory_value: (Number(material.stock) || 0) * (Number(material.avg_unit_cost) || 0),
+    }))
+    const lowStockMaterials = materials
+      .filter(material => material.current_stock <= material.min_stock_level)
+      .sort((a, b) => a.current_stock - b.current_stock)
 
     const monthGrossProfit = monthRevenue - monthProductCost
     const totalProducts = productsRes.count || 0
@@ -109,7 +132,9 @@ export const DashboardService = {
       monthProductCost,
       monthGrossProfit,
       monthProfitMargin: monthRevenue ? Math.round((monthGrossProfit / monthRevenue) * 100) : 0,
-      ordersNew: (statusCounts[OrderStatus.ORDER_RECEIVED] || 0) + (statusCounts[OrderStatus.PAYMENT_RECEIVED] || 0),
+      ordersNew: (statusCounts[OrderStatus.ORDER_RECEIVED] || 0)
+        + (statusCounts[OrderStatus.PAYMENT_PENDING] || 0)
+        + (statusCounts[OrderStatus.PAYMENT_RECEIVED] || 0),
       ordersPaymentPending: pendingRes.count || 0,
       ordersInStitching: statusCounts[OrderStatus.SENT_TO_STITCHING] || 0,
       ordersReadyToShip: (statusCounts[OrderStatus.STITCHING_COMPLETED] || 0) + (statusCounts[OrderStatus.PACKED] || 0),
@@ -118,6 +143,10 @@ export const DashboardService = {
       chartData: buildPaidChart(paidSales),
       totalExpenses,
       estimatedProfit: totalRevenue - totalExpenses,
+      materialValue: materials.reduce((sum, material) => sum + material.total_inventory_value, 0),
+      lowStockMaterialCount: lowStockMaterials.length,
+      outOfStockMaterialCount: materials.filter(material => material.current_stock <= 0).length,
+      lowStockMaterials,
     }
   },
 
@@ -128,7 +157,7 @@ export const DashboardService = {
     const { data, error } = await supabase
       .from('sales')
       .select('id, order_number, customer_name, product_name, final_amount, payment_status, status, sale_date')
-      .eq('payment_status', PaymentStatus.PAID)
+      .neq('status', OrderStatus.CANCELLED)
       .order('sale_date', { ascending: false })
       .limit(limit)
 

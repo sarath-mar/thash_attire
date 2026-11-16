@@ -62,7 +62,6 @@ export function useDashboard() {
     await Promise.all([
       fetchSummary(),
       fetchRecentSales(),
-      fetchLowStockProducts(),
       fetchTopProducts(),
     ])
   }

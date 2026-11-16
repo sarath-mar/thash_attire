@@ -18,7 +18,7 @@
             <button type="button" class="ta-bag__remove" @click="removeItem(itemKey(item))">Remove</button>
           </div>
         </div>
-        <b>{{ formatCurrency(item.price * item.quantity) }}</b>
+        <b>{{ formatCurrency(lineAmount(item)) }}</b>
       </li>
     </ul>
 
@@ -79,7 +79,7 @@ import { formatCurrency } from '~/helpers/currency.js'
 import { CustomerOrderService } from '~/services/CustomerOrderService.js'
 
 const config = useRuntimeConfig()
-const { items, subtotal, itemKey, setQuantity, removeItem, clear } = useCart()
+const { items, subtotal, itemKey, lineAmount, setQuantity, removeItem, clear } = useCart()
 const { isAuthenticated, profile } = useCustomerAuth()
 const { error: showError } = useSnackbar()
 

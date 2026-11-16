@@ -9,11 +9,11 @@ export const AuthService = {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw new Error(handleSupabaseError(error, 'Login failed'))
 
-    // const isAdmin = await this.verifyAdmin(data.user.id)
-    // if (!isAdmin) {
-    //   await this.logout()
-    //   throw new Error('Access denied. Admin privileges required.')
-    // }
+    const isAdmin = await this.verifyAdmin(data.user.id)
+    if (!isAdmin) {
+      await this.logout()
+      throw new Error('Access denied. Admin privileges required.')
+    }
 
     return data
   },

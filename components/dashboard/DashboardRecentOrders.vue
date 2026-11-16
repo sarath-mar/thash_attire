@@ -23,7 +23,7 @@
       v-else-if="!orders.length"
       icon="mdi-clipboard-list-outline"
       title="No recent orders"
-      description="Paid orders appear here after payment is recorded."
+      description="New shop orders appear here as soon as a customer places them."
     />
 
     <v-table v-else density="compact" class="ta-recent-orders__table">

@@ -71,7 +71,6 @@ const handleLogin = async () => {
   if (!valid) return
 
   const success = await login(email.value, password.value)
-  console.log('sher success', success)
 
   if (success) {
     await navigateTo(Routes.ADMIN_DASHBOARD)

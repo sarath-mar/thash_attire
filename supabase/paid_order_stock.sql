@@ -49,6 +49,66 @@ $$;
 REVOKE ALL ON FUNCTION public.deduct_sale_stock(UUID) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.deduct_sale_stock(UUID) FROM anon, authenticated;
 
+-- Puts pieces back when a paid order is cancelled. Runs only if stock was deducted.
+CREATE OR REPLACE FUNCTION public.restore_sale_stock(p_sale_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_item RECORD;
+BEGIN
+  FOR v_item IN
+    SELECT product_id, quantity
+    FROM sale_items
+    WHERE sale_id = p_sale_id
+    ORDER BY product_id
+  LOOP
+    IF v_item.product_id IS NULL THEN
+      CONTINUE;
+    END IF;
+
+    UPDATE products
+    SET stock = stock + COALESCE(v_item.quantity, 0),
+        updated_at = NOW()
+    WHERE id = v_item.product_id;
+  END LOOP;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.restore_sale_stock(UUID) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.restore_sale_stock(UUID) FROM anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_sale_stock_on_status()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NEW.status = 'cancelled' AND OLD.status IS DISTINCT FROM 'cancelled' THEN
+    IF COALESCE(OLD.stock_deducted, false) THEN
+      PERFORM public.restore_sale_stock(OLD.id);
+      NEW.stock_deducted := false;
+    END IF;
+  ELSIF OLD.status = 'cancelled' AND NEW.status IS DISTINCT FROM 'cancelled' THEN
+    IF COALESCE(NEW.payment_status, '') = 'paid' AND NOT COALESCE(NEW.stock_deducted, false) THEN
+      PERFORM public.deduct_sale_stock(OLD.id);
+      NEW.stock_deducted := true;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS sync_sale_stock_on_status ON sales;
+CREATE TRIGGER sync_sale_stock_on_status
+  BEFORE UPDATE OF status ON sales
+  FOR EACH ROW
+  EXECUTE FUNCTION public.sync_sale_stock_on_status();
+
 CREATE OR REPLACE FUNCTION public.record_sale_payment(
   p_sale_id UUID,
   p_method TEXT,

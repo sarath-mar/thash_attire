@@ -27,11 +27,24 @@ function itemKey(item) {
   return [item.productId, item.size || '', item.color || ''].join('|')
 }
 
+function offerStillApplies(list) {
+  if (!list.length) return false
+  const offerId = list[0].offerId
+  if (!offerId) return false
+  return list.every(item => item.offerId === offerId && item.quantity === item.offerQty && item.offerLineTotal != null)
+}
+
+function lineAmount(item, list = items.value) {
+  if (offerStillApplies(list)) return Number(item.offerLineTotal) || 0
+  const unit = item.listPrice != null ? Number(item.listPrice) : Number(item.price) || 0
+  return unit * (Number(item.quantity) || 0)
+}
+
 export function useCart() {
   onMounted(ensureHydrated)
 
   const count = computed(() => items.value.reduce((sum, item) => sum + item.quantity, 0))
-  const subtotal = computed(() => items.value.reduce((sum, item) => sum + (item.price * item.quantity), 0))
+  const subtotal = computed(() => items.value.reduce((sum, item) => sum + lineAmount(item), 0))
 
   function addItem(item) {
     ensureHydrated()
@@ -41,14 +54,16 @@ export function useCart() {
       existing.quantity = Math.min(20, existing.quantity + (item.quantity || 1))
       if (item.offerId) {
         existing.offerId = item.offerId
-        existing.offerQty = existing.quantity
         existing.price = Number(item.price) || existing.price
+        if (item.listPrice != null) existing.listPrice = Number(item.listPrice)
       }
     } else {
       items.value.push({
         productId: item.productId,
         name: item.name,
         price: Number(item.price) || 0,
+        listPrice: item.listPrice != null ? Number(item.listPrice) : Number(item.price) || 0,
+        offerLineTotal: item.offerLineTotal != null ? Number(item.offerLineTotal) : null,
         image: item.image || '',
         size: item.size || '',
         color: item.color || '',
@@ -86,6 +101,7 @@ export function useCart() {
     count,
     subtotal,
     itemKey,
+    lineAmount,
     addItem,
     setQuantity,
     removeItem,

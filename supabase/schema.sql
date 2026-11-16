@@ -347,20 +347,30 @@ CREATE TRIGGER update_settings_updated_at
   BEFORE UPDATE ON settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ─── Auto-create profile on signup ──────────────────────────
-CREATE OR REPLACE FUNCTION handle_new_user()
-RETURNS TRIGGER AS $$
+-- search_path and the grants below are required. Without them, Auth shows
+-- "Database error creating new user" because this trigger cannot see profiles.
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
-  INSERT INTO profiles (id, email, role)
-  VALUES (NEW.id, NEW.email, 'customer')
+  INSERT INTO public.profiles (id, email, role)
+  VALUES (NEW.id, COALESCE(NEW.email, ''), 'customer')
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+GRANT USAGE ON SCHEMA public TO supabase_auth_admin;
+GRANT INSERT, SELECT ON TABLE public.profiles TO supabase_auth_admin;
+GRANT EXECUTE ON FUNCTION public.handle_new_user() TO supabase_auth_admin;
 
 -- Existing admin users have no account_type claim and keep full staff access.
 -- New auth users are marked as storefront customers. Promote a real admin with:
@@ -411,6 +421,8 @@ DROP TRIGGER IF EXISTS mark_storefront_customer ON auth.users;
 CREATE TRIGGER mark_storefront_customer
   BEFORE INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.mark_storefront_customer();
+
+GRANT EXECUTE ON FUNCTION public.mark_storefront_customer() TO supabase_auth_admin;
 
 CREATE OR REPLACE FUNCTION public.prevent_profile_role_escalation()
 RETURNS TRIGGER
@@ -731,6 +743,66 @@ $$;
 
 REVOKE ALL ON FUNCTION public.deduct_sale_stock(UUID) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.deduct_sale_stock(UUID) FROM anon, authenticated;
+
+-- Puts pieces back when a paid order is cancelled. Runs only if stock was deducted.
+CREATE OR REPLACE FUNCTION public.restore_sale_stock(p_sale_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_item RECORD;
+BEGIN
+  FOR v_item IN
+    SELECT product_id, quantity
+    FROM sale_items
+    WHERE sale_id = p_sale_id
+    ORDER BY product_id
+  LOOP
+    IF v_item.product_id IS NULL THEN
+      CONTINUE;
+    END IF;
+
+    UPDATE products
+    SET stock = stock + COALESCE(v_item.quantity, 0),
+        updated_at = NOW()
+    WHERE id = v_item.product_id;
+  END LOOP;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.restore_sale_stock(UUID) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.restore_sale_stock(UUID) FROM anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_sale_stock_on_status()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NEW.status = 'cancelled' AND OLD.status IS DISTINCT FROM 'cancelled' THEN
+    IF COALESCE(OLD.stock_deducted, false) THEN
+      PERFORM public.restore_sale_stock(OLD.id);
+      NEW.stock_deducted := false;
+    END IF;
+  ELSIF OLD.status = 'cancelled' AND NEW.status IS DISTINCT FROM 'cancelled' THEN
+    IF COALESCE(NEW.payment_status, '') = 'paid' AND NOT COALESCE(NEW.stock_deducted, false) THEN
+      PERFORM public.deduct_sale_stock(OLD.id);
+      NEW.stock_deducted := true;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS sync_sale_stock_on_status ON sales;
+CREATE TRIGGER sync_sale_stock_on_status
+  BEFORE UPDATE OF status ON sales
+  FOR EACH ROW
+  EXECUTE FUNCTION public.sync_sale_stock_on_status();
 
 CREATE OR REPLACE FUNCTION public.record_sale_payment(
   p_sale_id UUID,

@@ -636,6 +636,7 @@ function mapOffer(offer) {
     return {
       ...line,
       unitPrice: line.quantity ? Number((lineAmount / line.quantity).toFixed(2)) : lineAmount,
+      lineTotal: lineAmount,
     }
   })
   return {
@@ -728,6 +729,8 @@ function addOffer(offer) {
       productId: line.productId,
       name: line.name,
       price: line.unitPrice,
+      listPrice: line.sellingPrice,
+      offerLineTotal: line.lineTotal,
       image: line.image,
       size: '',
       color: '',

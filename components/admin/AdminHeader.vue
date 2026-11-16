@@ -51,7 +51,11 @@ defineEmits(['toggle-drawer'])
 
 const route = useRoute()
 const { mdAndUp } = useDisplay()
-const { user, logout, loading: logoutLoading } = useAuth()
+const { user, logout, loading: logoutLoading, initAuth } = useAuth()
+
+onMounted(() => {
+  initAuth()
+})
 
 const pageTitle = computed(() => {
   const meta = route.meta?.title

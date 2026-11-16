@@ -229,16 +229,14 @@ useHead({ title: PageTitles.ADMIN_DASHBOARD })
 const {
   summary,
   recentSales,
-  lowStockProducts,
   topProducts,
   fetchAll,
   loadingSummary,
   loadingRecentSales,
-  loadingLowStock,
   loadingTopProducts
 } = useDashboard()
 
-const loading = computed(() => loadingSummary.value || loadingRecentSales.value || loadingLowStock.value || loadingTopProducts.value)
+const loading = computed(() => loadingSummary.value || loadingRecentSales.value || loadingTopProducts.value)
 
 const stats = computed(() => {
   const s = summary.value || {}
@@ -257,12 +255,12 @@ const stats = computed(() => {
     month_revenue_calc: s.monthRevenue || 0,
     month_gross_profit: s.monthGrossProfit || 0,
     month_profit_margin: s.monthProfitMargin || 0,
-    total_material_value: 0,
-    low_stock_materials: 0,
-    out_of_stock_materials: 0,
+    total_material_value: s.materialValue || 0,
+    low_stock_materials: s.lowStockMaterialCount || 0,
+    out_of_stock_materials: s.outOfStockMaterialCount || 0,
     chart_data: s.chartData || [],
     recent_orders: recentSales.value || [],
-    low_stock_materials_list: lowStockProducts.value || []
+    low_stock_materials_list: s.lowStockMaterials || []
   }
 })
 
