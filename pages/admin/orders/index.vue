@@ -89,6 +89,14 @@
       </template>
 
       <template #[`item.actions`]="{ item }">
+        <v-btn
+          icon="mdi-whatsapp"
+          size="small"
+          variant="text"
+          color="success"
+          aria-label="Share on WhatsApp"
+          @click="shareOrder(item)"
+        />
         <v-menu location="bottom end">
           <template #activator="{ props: menuProps }">
             <v-btn icon="mdi-dots-vertical" size="small" variant="text" v-bind="menuProps" />
@@ -102,6 +110,7 @@
               @click="openPayment(item)"
             />
             <v-list-item prepend-icon="mdi-progress-check" title="Update status" @click="openStatus(item)" />
+            <v-list-item prepend-icon="mdi-whatsapp" title="Share on WhatsApp" @click="shareOrder(item)" />
           </v-list>
         </v-menu>
       </template>
@@ -119,11 +128,13 @@ import { PaymentStatus, PaymentStatusLabels, PaymentStatusColors } from '~/enums
 import { OrderStatusLabels, OrderStatusColors, OrderStatus } from '~/enums/orderStatus.js'
 import { formatCurrency } from '~/helpers/currency.js'
 import { expectedDeliveryOf, formatDate } from '~/helpers/date.js'
+import { shareOrderOnWhatsApp } from '~/helpers/orderShare.js'
 import { SalesService } from '~/services/SalesService.js'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
 useHead({ title: PageTitles.ADMIN_ORDERS })
 
+const { error: showError } = useSnackbar()
 const loading = ref(true)
 const allOrders = ref([])
 const searchQuery = ref('')
@@ -139,6 +150,12 @@ function openPayment(order) {
 function openStatus(order) {
   activeOrder.value = order
   statusOpen.value = true
+}
+
+function shareOrder(order) {
+  if (!shareOrderOnWhatsApp(order)) {
+    showError('This order has no customer number to share on WhatsApp.')
+  }
 }
 
 function applySaved(updated) {
@@ -161,7 +178,7 @@ const headers = [
   { title: 'Status', key: 'order_status' },
   { title: 'Exp. Delivery', key: 'expected_delivery' },
   { title: 'Date', key: 'order_date' },
-  { title: '', key: 'actions', sortable: false, width: 48 },
+  { title: '', key: 'actions', sortable: false, width: 96 },
 ]
 
 const orders = computed(() => {

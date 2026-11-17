@@ -17,6 +17,9 @@
           >
             Record payment
           </v-btn>
+          <v-btn variant="outlined" class="mr-2" prepend-icon="mdi-whatsapp" @click="shareOrder">
+            Share on WhatsApp
+          </v-btn>
           <v-btn variant="outlined" class="mr-2" @click="statusOpen = true">Update status</v-btn>
           <v-btn
             color="primary"
@@ -257,6 +260,7 @@ import { addDays, expectedDeliveryOf, formatDate, toDateInput } from '~/helpers/
 import { PaymentStatus, PaymentStatusLabels, PaymentStatusColors, PaymentMethodLabels, PaymentAppLabels } from '~/enums/paymentStatus.js'
 import { OrderStatusLabels, OrderStatusIcons, OrderWorkflowSteps, OrderStatus } from '~/enums/orderStatus.js'
 import { historyWithStatus, orderStatusOf, progressStep } from '~/helpers/orderWorkflow.js'
+import { shareOrderOnWhatsApp } from '~/helpers/orderShare.js'
 import { SalesService } from '~/services/SalesService.js'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
@@ -269,6 +273,12 @@ const advancing = ref(false)
 const paymentOpen = ref(false)
 const statusOpen = ref(false)
 const order = ref(null)
+
+function shareOrder() {
+  if (!shareOrderOnWhatsApp(order.value)) {
+    showError('This order has no customer number to share on WhatsApp.')
+  }
+}
 
 function applySaved(updated) {
   order.value = {
