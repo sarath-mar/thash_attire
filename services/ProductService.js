@@ -3,6 +3,7 @@ import { StorageService } from './StorageService.js'
 import { ProductStatus } from '~/enums/productStatus.js'
 import { StorageBucket } from '~/enums/storageBucket.js'
 import { PaginationDefaults } from '~/constants/app.js'
+import { calcLiveProductCost } from '~/helpers/profit.js'
 
 const PRODUCT_UI_ONLY_FIELDS = [
   'materials',
@@ -12,6 +13,7 @@ const PRODUCT_UI_ONLY_FIELDS = [
   'categories',
   'product_materials',
   'initial_sample_created',
+  'live_cost',
 ]
 
 function mapProductMaterials(rows = []) {
@@ -29,7 +31,7 @@ function mapProduct(data) {
   if (!data) return data
   const materials = mapProductMaterials(data.product_materials || [])
   const { product_materials, ...rest } = data
-  return {
+  const mapped = {
     ...rest,
     materials,
     video: rest.videos?.[0] || null,
@@ -38,6 +40,10 @@ function mapProduct(data) {
     other_cost: Number(rest.other_cost) || 0,
     low_stock_threshold: Number(rest.low_stock_threshold) || 5,
     target_margin: Number(rest.target_margin) || 40,
+  }
+  return {
+    ...mapped,
+    live_cost: calcLiveProductCost(mapped),
   }
 }
 
@@ -164,9 +170,13 @@ export const ProductService = {
       isAdmin = false,
     } = filters
 
+    const columns = isAdmin
+      ? '*, categories(id, name, slug), product_materials(quantity_required, materials(avg_unit_cost))'
+      : '*, categories(id, name, slug)'
+
     let query = supabase
       .from('products')
-      .select('*, categories(id, name, slug)', { count: 'exact' })
+      .select(columns, { count: 'exact' })
 
     if (status) query = query.eq('status', status)
     if (categoryId) query = query.eq('category_id', categoryId)
@@ -183,7 +193,8 @@ export const ProductService = {
     const { data, error, count } = await query
     if (error) throw new Error(handleSupabaseError(error))
 
-    return { data: data || [], total: count || 0 }
+    const rows = isAdmin ? (data || []).map(mapProduct) : (data || [])
+    return { data: rows, total: count || 0 }
   },
 
   async getById(id) {
@@ -268,6 +279,8 @@ export const ProductService = {
 
     const materials = product.materials
     const productData = buildProductPayload(product)
+    delete productData.cost_price
+    delete productData.stock
     if (Array.isArray(product.images) || product.video !== undefined || Array.isArray(product.videos)) {
       productData.images = await storedMediaList(product.images, StorageBucket.PRODUCTS, 'products')
       productData.videos = await storedMediaList(
@@ -289,8 +302,21 @@ export const ProductService = {
 
     if (shouldSyncMaterials) {
       await this.syncMaterials(id, materials)
+      const { error: stockError } = await supabase.rpc('refresh_product_stock', { p_product_id: id })
+      const stockMessage = stockError?.message || ''
+      const stockRpcMissing = /refresh_product_stock|schema cache|could not find the function/i.test(stockMessage)
+      if (stockError && !stockRpcMissing) throw new Error(handleSupabaseError(stockError))
     }
 
+    return this.getById(id)
+  },
+
+  async recalculateCost(id) {
+    const supabase = getSupabaseClient()
+    if (!supabase) throw new Error('Supabase client not initialized')
+
+    const { error } = await supabase.rpc('recalculate_product_cost', { p_product_id: id })
+    if (error) throw new Error(handleSupabaseError(error))
     return this.getById(id)
   },
 

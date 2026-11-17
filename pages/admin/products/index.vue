@@ -48,8 +48,10 @@
 
       <template #[`item.cost_price`]="{ item }">{{ formatCurrency(item.cost_price) }}</template>
       <template #[`item.selling_price`]="{ item }">{{ formatCurrency(item.selling_price) }}</template>
-      <template #[`item.profit`]="{ item }">{{ formatCurrency(calcProfit(item.selling_price, item.cost_price)) }}</template>
-      <template #[`item.margin`]="{ item }">{{ calcProfitMargin(item.selling_price, item.cost_price) }}%</template>
+      <template #[`item.profit`]="{ item }">{{ formatCurrency(calcProfit(item.selling_price, liveCost(item))) }}</template>
+      <template #[`item.margin`]="{ item }">
+        <span :class="marginClass(item)">{{ calcProfitMargin(item.selling_price, liveCost(item)) }}%</span>
+      </template>
       <template #[`item.stock`]="{ item }">
         <span :class="stockClass(item)">{{ item.stock }}</span>
       </template>
@@ -102,7 +104,7 @@ import { Routes } from '~/constants/routes.js'
 import { PageTitles } from '~/constants/pageTitles.js'
 import { ProductStatusLabels, ProductStatusColors, ProductStatus } from '~/enums/productStatus.js'
 import { formatCurrency } from '~/helpers/currency.js'
-import { calcProfit, calcProfitMargin } from '~/helpers/profit.js'
+import { calcProfit, calcProfitMargin, meetsTargetMargin } from '~/helpers/profit.js'
 import { getProductImageUrl } from '~/helpers/imageUrl.js'
 import { CategoryService } from '~/services/CategoryService.js'
 import { PaginationDefaults } from '~/constants/app.js'
@@ -131,11 +133,11 @@ const headers = [
   { title: 'Product', key: 'name' },
   { title: 'SKU', key: 'sku' },
   { title: 'Category', key: 'categories.name' },
-  { title: 'Cost', key: 'cost_price' },
+  { title: 'Saved cost', key: 'cost_price' },
   { title: 'Price', key: 'selling_price' },
-  { title: 'Profit', key: 'profit', sortable: false },
-  { title: 'Margin', key: 'margin', sortable: false },
-  { title: 'Stock', key: 'stock' },
+  { title: 'Profit now', key: 'profit', sortable: false },
+  { title: 'Margin now', key: 'margin', sortable: false },
+  { title: 'Can make', key: 'stock' },
   { title: 'Status', key: 'status' },
   { title: '', key: 'actions', sortable: false, width: 48 },
 ]
@@ -158,9 +160,15 @@ const loadProducts = () => {
 const onSearch = (val) => { searchQuery.value = val; page.value = 1; loadProducts() }
 const onPageChange = (p) => { page.value = p; loadProducts() }
 
+const liveCost = (item) => Number(item.live_cost ?? item.cost_price) || 0
+
 const stockClass = (item) => ({
   'text-error': item.stock === 0,
-  'text-warning': item.stock > 0 && item.stock <= 5,
+  'text-warning': item.stock > 0 && item.stock <= (item.low_stock_threshold || 5),
+})
+
+const marginClass = (item) => ({
+  'text-warning': !meetsTargetMargin(item.selling_price, liveCost(item), item.target_margin ?? 40),
 })
 
 const confirmDelete = (item) => { productToDelete.value = item; deleteDialog.value = true }

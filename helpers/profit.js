@@ -32,6 +32,21 @@ export function calcMaterialLineCost(quantity, avgUnitCost) {
   return Math.round(qty * cost * 100) / 100
 }
 
+/** One piece at today's cloth average, plus stitching, packaging, and other charges. */
+export function calcLiveProductCost(product = {}) {
+  const rows = product.materials || product.product_materials || []
+  const materialCost = rows.reduce((sum, row) => {
+    const qty = Number(row.quantity ?? row.quantity_required) || 0
+    const unit = Number(row.unit_cost ?? row.materials?.avg_unit_cost) || 0
+    return sum + qty * unit
+  }, 0)
+  const total = materialCost
+    + (Number(product.stitching_cost) || 0)
+    + (Number(product.packaging_cost) || 0)
+    + (Number(product.other_cost) || 0)
+  return Math.round(total * 100) / 100
+}
+
 /** Weighted average after adding a purchase to existing stock. */
 export function calcWeightedAvg(existingStock, existingAvg, newQty, newTotalCost) {
   const stock = Number(existingStock) || 0

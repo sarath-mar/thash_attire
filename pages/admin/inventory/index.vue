@@ -134,7 +134,7 @@ const productHeaders = [
   { title: '', key: 'image', sortable: false, width: 48 },
   { title: 'Product', key: 'name' },
   { title: 'SKU', key: 'sku' },
-  { title: 'Stock', key: 'stock' },
+  { title: 'Can make', key: 'stock' },
   { title: 'Threshold', key: 'low_stock_threshold' },
   { title: 'Status', key: 'status', sortable: false },
 ]

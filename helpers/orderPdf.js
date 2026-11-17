@@ -1,13 +1,13 @@
 const PAGE_W = 595
 const PAGE_H = 842
-const LEFT = 36
-const RIGHT = 559
+const LEFT = 46
+const RIGHT = 549
+const IVORY = '0.984 0.957 0.925'
+const BLUSH = '0.941 0.725 0.741'
+const ROSE = '0.851 0.439 0.478'
 const INK = '0.137 0.102 0.114'
-const ROSE = '0.635 0.294 0.384'
-const BLUSH = '0.941 0.824 0.831'
-const IVORY = '1.000 0.973 0.965'
-const WHITE = '1 1 1'
-const MUTE = '0.478 0.392 0.408'
+const MUTE = '0.435 0.376 0.388'
+const RULE = '0.851 0.439 0.478'
 
 function pdfText(value) {
   return String(value ?? '')
@@ -22,7 +22,7 @@ function pdfText(value) {
 function money(amount) {
   const value = Number(amount)
   const safe = Number.isFinite(value) ? value : 0
-  return `Rs. ${safe.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+  return `Rs. ${safe.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 function textWidth(text, size, bold = false) {
@@ -41,7 +41,7 @@ function textWidth(text, size, bold = false) {
 
 function wrapToWidth(text, size, maxWidth, bold = false) {
   const words = String(text || '').split(/\s+/).filter(Boolean)
-  if (!words.length) return ['']
+  if (!words.length) return []
   const lines = []
   let current = ''
   words.forEach((word) => {
@@ -72,210 +72,127 @@ function fill(ops, x, y, w, h, color) {
 }
 
 function stroke(ops, x, y, w, h, color) {
-  ops.push('0.6 w')
+  ops.push('0.8 w')
   ops.push(`${color} RG`)
   ops.push(`${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re S`)
 }
 
-function hline(ops, x1, x2, y, color) {
-  ops.push('0.6 w')
+function hline(ops, x1, x2, y, color = RULE) {
+  ops.push('0.7 w')
   ops.push(`${color} RG`)
   ops.push(`${x1.toFixed(2)} ${y.toFixed(2)} m ${x2.toFixed(2)} ${y.toFixed(2)} l S`)
 }
 
 function drawText(ops, x, y, text, size, font, color) {
+  const value = pdfText(text)
+  if (!value) return
   ops.push('BT')
   ops.push(`/${font} ${size} Tf`)
   ops.push(`${color} rg`)
   ops.push(`1 0 0 1 ${x.toFixed(2)} ${y.toFixed(2)} Tm`)
-  ops.push(`(${pdfText(text)}) Tj`)
+  ops.push(`(${value}) Tj`)
   ops.push('ET')
 }
 
 function drawRight(ops, right, y, text, size, font, color, bold = false) {
-  const x = right - textWidth(text, size, bold)
-  drawText(ops, x, y, text, size, font, color)
+  drawText(ops, right - textWidth(text, size, bold), y, text, size, font, color)
 }
 
-function drawCenter(ops, center, y, text, size, font, color, bold = false) {
-  const x = center - textWidth(text, size, bold) / 2
-  drawText(ops, x, y, text, size, font, color)
-}
-
-function pageShell(ops, orderNumber, continued) {
-  fill(ops, 0, 0, PAGE_W, PAGE_H, IVORY)
-  fill(ops, 0, PAGE_H - 108, PAGE_W, 108, ROSE)
-  drawText(ops, LEFT, PAGE_H - 52, 'THASH ATTIRE', 22, 'F2', WHITE)
-  drawText(ops, LEFT, PAGE_H - 74, 'Made for one person only', 10, 'F3', '1 0.91 0.92')
-  if (continued) {
-    drawRight(ops, RIGHT, PAGE_H - 58, `Order ${orderNumber}`, 11, 'F1', WHITE)
-    drawRight(ops, RIGHT, PAGE_H - 74, 'Continued', 9, 'F3', '1 0.91 0.92')
-  } else {
-    drawRight(ops, RIGHT, PAGE_H - 58, 'ORDER DETAILS', 11, 'F2', WHITE)
-  }
-}
-
-function metaBox(ops, x, y, w, h, label, value) {
-  fill(ops, x, y, w, h, WHITE)
-  stroke(ops, x, y, w, h, BLUSH)
-  drawText(ops, x + 12, y + h - 16, label.toUpperCase(), 8, 'F2', ROSE)
-  const lines = wrapToWidth(value || '—', 11, w - 24)
-  lines.slice(0, 2).forEach((line, index) => {
-    drawText(ops, x + 12, y + h - 34 - index * 14, line, 11, 'F1', INK)
-  })
-}
-
-function tableHeader(ops, y) {
-  const h = 26
-  fill(ops, LEFT, y - 8, RIGHT - LEFT, h, INK)
-  drawText(ops, LEFT + 12, y, 'PIECE', 8, 'F2', WHITE)
-  drawCenter(ops, 348, y, 'QTY', 8, 'F2', WHITE, true)
-  drawRight(ops, 452, y, 'RATE', 8, 'F2', WHITE, true)
-  drawRight(ops, RIGHT - 12, y, 'AMOUNT', 8, 'F2', WHITE, true)
-  return y - h
-}
-
-function tableRow(ops, y, item, shaded) {
-  const nameLines = wrapToWidth(item.product_name || 'Piece', 11, 250)
-  const rowH = Math.max(28, 14 + nameLines.length * 14)
-  if (shaded) fill(ops, LEFT, y - rowH + 16, RIGHT - LEFT, rowH, WHITE)
-  nameLines.forEach((line, index) => {
-    drawText(ops, LEFT + 12, y - index * 14, line, 11, 'F1', INK)
-  })
-  const mid = y - Math.max(0, (nameLines.length - 1) * 7)
-  const qty = String(Number(item.quantity) || 1)
-  const rate = money(item.selling_price)
-  const amount = money((Number(item.selling_price) || 0) * (Number(item.quantity) || 1))
-  drawCenter(ops, 348, mid, qty, 11, 'F1', INK)
-  drawRight(ops, 452, mid, rate, 11, 'F1', INK)
-  drawRight(ops, RIGHT - 12, mid, amount, 11, 'F2', INK, true)
-  hline(ops, LEFT, RIGHT, y - rowH + 16, BLUSH)
-  return y - rowH
+function paymentLines(order, labels) {
+  const lines = [['Method', labels.method || 'Paid']]
+  if (labels.app) lines.push(['UPI app', labels.app])
+  if (labels.paidOn) lines.push(['Paid on', labels.paidOn])
+  if (labels.transaction) lines.push(['Transaction', labels.transaction])
+  lines.push(['Amount', money(order?.final_amount)])
+  return lines
 }
 
 function buildPages(order, labels) {
   const pieces = orderPieces(order)
-  const pages = []
-  let ops = []
-  pages.push(ops)
-  pageShell(ops, order?.order_number || '', false)
-
-  let y = PAGE_H - 140
-  drawText(ops, LEFT, y, order?.order_number || 'Order', 22, 'F2', INK)
-  y -= 28
-  const boxW = (RIGHT - LEFT - 12) / 2
-  const boxH = 52
-  const meta = [
-    ['Placed', labels.placed || '—'],
-    ['Payment', labels.payment || '—'],
-    ['Expected', labels.expected || '—'],
-    ['Customer', [order?.customer_name, order?.customer_phone].filter(Boolean).join('  ·  ') || '—'],
-  ]
-  meta.forEach((entry, index) => {
-    const col = index % 2
-    const row = Math.floor(index / 2)
-    metaBox(ops, LEFT + col * (boxW + 12), y - boxH - row * (boxH + 10), boxW, boxH, entry[0], entry[1])
-  })
-  y -= boxH * 2 + 28
-
-  drawText(ops, LEFT, y, 'YOUR PIECES', 9, 'F2', ROSE)
-  y -= 34
-  y = tableHeader(ops, y)
-
+  const discount = Number(order?.discount) || 0
   const subtotal = pieces.reduce((sum, item) => {
     return sum + (Number(item.selling_price) || 0) * (Number(item.quantity) || 1)
   }, 0)
+  const addressLines = wrapToWidth(order?.shipping_address || '', 10, 230)
+  const payments = paymentLines(order, labels)
+  const ops = []
 
-  pieces.forEach((item, index) => {
-    const nameLines = wrapToWidth(item.product_name || 'Piece', 11, 250)
-    const rowH = Math.max(28, 14 + nameLines.length * 14)
-    if (y - rowH < 150) {
-      ops = []
-      pages.push(ops)
-      pageShell(ops, order?.order_number || '', true)
-      y = PAGE_H - 140
-      drawText(ops, LEFT, y, 'YOUR PIECES', 9, 'F2', ROSE)
-      y -= 34
-      y = tableHeader(ops, y)
-    }
-    y = tableRow(ops, y, item, index % 2 === 0)
+  fill(ops, 0, 0, PAGE_W, PAGE_H, IVORY)
+  fill(ops, 0, 0, PAGE_W, 548, BLUSH)
+
+  drawText(ops, LEFT, 786, 'Thash Attire', 28, 'F4', ROSE)
+  drawText(ops, LEFT, 754, 'Made for one person only', 9, 'F3', MUTE)
+  drawText(ops, LEFT, 740, 'hello@thashattire.com', 9, 'F1', MUTE)
+  if (labels.companyPhone) drawText(ops, LEFT, 726, labels.companyPhone, 9, 'F1', MUTE)
+
+  drawRight(ops, RIGHT, 786, 'Invoice #', 9, 'F2', INK, true)
+  drawRight(ops, RIGHT, 768, order?.order_number || '—', 12, 'F2', INK, true)
+  drawRight(ops, RIGHT, 746, 'Invoice Date', 9, 'F2', INK, true)
+  drawRight(ops, RIGHT, 730, labels.placed || '—', 11, 'F1', INK)
+
+  const customerTop = labels.companyPhone ? 692 : 706
+  drawText(ops, LEFT, customerTop, order?.customer_name || 'Customer', 12, 'F2', INK)
+  let cursor = customerTop - 16
+  if (order?.customer_phone) {
+    drawText(ops, LEFT, cursor, order.customer_phone, 10, 'F1', MUTE)
+    cursor -= 14
+  }
+  addressLines.slice(0, 3).forEach((line) => {
+    drawText(ops, LEFT, cursor, line, 10, 'F1', MUTE)
+    cursor -= 13
   })
 
-  const discount = Number(order?.discount) || 0
-  const totalBlock = 36 + (discount > 0 ? 18 : 0) + 28
-  if (y - totalBlock < 120) {
-    ops = []
-    pages.push(ops)
-    pageShell(ops, order?.order_number || '', true)
-    y = PAGE_H - 140
-  }
+  drawText(ops, LEFT, 500, 'Invoice', 26, 'F2', INK)
 
-  y -= 16
-  const summaryTop = y
-  const summaryH = 24 + (discount > 0 ? 18 : 0) + 28
-  fill(ops, 330, summaryTop - summaryH, RIGHT - 330, summaryH, WHITE)
-  stroke(ops, 330, summaryTop - summaryH, RIGHT - 330, summaryH, BLUSH)
-  let lineY = summaryTop - 18
-  drawText(ops, 344, lineY, 'Subtotal', 10, 'F1', MUTE)
-  drawRight(ops, RIGHT - 12, lineY, money(subtotal), 10, 'F1', INK)
+  const tableLeft = 214
+  const priceX = 430
+  const qtyX = 478
+  const totalX = RIGHT
+
+  drawText(ops, tableLeft, 528, 'Description', 11, 'F2', INK)
+  drawRight(ops, priceX, 528, 'Price', 11, 'F2', INK, true)
+  drawText(ops, qtyX - textWidth('QTY', 11, true) / 2, 528, 'QTY', 11, 'F2', INK)
+  drawRight(ops, totalX, 528, 'Total', 11, 'F2', INK, true)
+  hline(ops, tableLeft, RIGHT, 520)
+
+  let rowY = 498
+  pieces.forEach((item) => {
+    if (rowY < 250) return
+    const qty = Number(item.quantity) || 1
+    const rate = Number(item.selling_price) || 0
+    const name = wrapToWidth(item.product_name || 'Piece', 11, 150)[0] || 'Piece'
+    const qtyText = String(qty)
+    drawText(ops, tableLeft, rowY, name, 11, 'F1', INK)
+    drawRight(ops, priceX, rowY, money(rate), 11, 'F1', INK)
+    drawText(ops, qtyX - textWidth(qtyText, 11) / 2, rowY, qtyText, 11, 'F1', INK)
+    drawRight(ops, totalX, rowY, money(rate * qty), 11, 'F1', INK)
+    hline(ops, tableLeft, RIGHT, rowY - 8)
+    rowY -= 28
+  })
+
+  const totalsTop = Math.max(rowY - 8, 210)
+  hline(ops, 390, RIGHT, totalsTop + 16)
+  drawText(ops, 394, totalsTop, 'Subtotal', 11, 'F1', INK)
+  drawRight(ops, totalX, totalsTop, money(subtotal), 11, 'F1', INK)
+  let totalY = totalsTop - 20
   if (discount > 0) {
-    lineY -= 18
-    drawText(ops, 344, lineY, 'Discount', 10, 'F1', MUTE)
-    drawRight(ops, RIGHT - 12, lineY, money(discount), 10, 'F1', INK)
+    drawText(ops, 394, totalY, 'Discount', 11, 'F1', INK)
+    drawRight(ops, totalX, totalY, money(discount), 11, 'F1', INK)
+    totalY -= 20
   }
-  lineY -= 22
-  drawText(ops, 344, lineY, 'Total', 13, 'F2', INK)
-  drawRight(ops, RIGHT - 12, lineY, money(order?.final_amount), 13, 'F2', ROSE, true)
-  y = summaryTop - summaryH - 28
+  hline(ops, 390, RIGHT, totalY + 14)
+  drawText(ops, 394, totalY - 4, 'Total', 12, 'F2', INK)
+  drawRight(ops, totalX, totalY - 4, money(order?.final_amount), 12, 'F2', INK, true)
 
-  const address = order?.shipping_address || ''
-  const note = order?.notes || ''
-  if (address || note) {
-    const addressLines = address ? wrapToWidth(address, 11, RIGHT - LEFT - 24) : []
-    const noteLines = note ? wrapToWidth(note, 11, RIGHT - LEFT - 24) : []
-    const blockH = 36 + addressLines.length * 14 + (note ? 20 + noteLines.length * 14 : 0)
-    if (y - blockH < 56) {
-      ops = []
-      pages.push(ops)
-      pageShell(ops, order?.order_number || '', true)
-      y = PAGE_H - 140
-    }
-    fill(ops, LEFT, y - blockH, RIGHT - LEFT, blockH, WHITE)
-    stroke(ops, LEFT, y - blockH, RIGHT - LEFT, blockH, BLUSH)
-    let textY = y - 18
-    if (address) {
-      drawText(ops, LEFT + 12, textY, 'DELIVERY', 8, 'F2', ROSE)
-      textY -= 16
-      addressLines.forEach((line) => {
-        drawText(ops, LEFT + 12, textY, line, 11, 'F1', INK)
-        textY -= 14
-      })
-    }
-    if (note) {
-      textY -= 6
-      drawText(ops, LEFT + 12, textY, 'NOTE', 8, 'F2', ROSE)
-      textY -= 16
-      noteLines.forEach((line) => {
-        drawText(ops, LEFT + 12, textY, line, 11, 'F1', INK)
-        textY -= 14
-      })
-    }
-  }
-
-  pages.forEach((pageOps, index) => {
-    drawText(
-      pageOps,
-      LEFT,
-      28,
-      'A copy of your order. This is not a tax invoice.',
-      8,
-      'F3',
-      MUTE,
-    )
-    drawRight(pageOps, RIGHT, 28, `${index + 1} / ${pages.length}`, 8, 'F1', MUTE)
+  hline(ops, LEFT, RIGHT, 148)
+  drawText(ops, LEFT, 126, 'Payment details', 11, 'F2', INK)
+  payments.forEach((entry, index) => {
+    const y = 106 - index * 16
+    drawText(ops, LEFT, y, entry[0], 10, 'F1', MUTE)
+    drawText(ops, LEFT + 92, y, entry[1], 10, 'F1', INK)
   })
 
-  return pages.map(pageOps => pageOps.join('\n') + '\n')
+  return [ops.join('\n') + '\n']
 }
 
 export function buildOrderPdf(order, labels = {}) {
@@ -289,12 +206,13 @@ export function buildOrderPdf(order, labels = {}) {
   const regularId = add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>')
   const boldId = add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>')
   const italicId = add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique >>')
+  const scriptId = add('<< /Type /Font /Subtype /Type1 /BaseFont /Times-Italic >>')
   const pageIds = []
 
   streams.forEach((stream) => {
     const contentId = add(`<< /Length ${stream.length} >>\nstream\n${stream}endstream`)
     const pageId = add(
-      `<< /Type /Page /Parent PAGES_ID 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Contents ${contentId} 0 R /Resources << /Font << /F1 ${regularId} 0 R /F2 ${boldId} 0 R /F3 ${italicId} 0 R >> >> >>`,
+      `<< /Type /Page /Parent PAGES_ID 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Contents ${contentId} 0 R /Resources << /Font << /F1 ${regularId} 0 R /F2 ${boldId} 0 R /F3 ${italicId} 0 R /F4 ${scriptId} 0 R >> >> >>`,
     )
     pageIds.push(pageId)
   })

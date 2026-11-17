@@ -15,7 +15,7 @@
       <div class="ta-product-card__footer">
         <strong class="ta-product-card__price">{{ formatCurrency(product.selling_price) }}</strong>
         <span class="ta-product-card__stock" :class="stockClass">
-          {{ product.stock }} in stock
+          {{ product.stock }} can be made
         </span>
       </div>
     </v-card-text>

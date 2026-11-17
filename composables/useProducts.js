@@ -89,6 +89,23 @@ export function useProducts() {
     }
   }
 
+  const recalculateCost = async (id) => {
+    saving.value = true
+    try {
+      const result = await ProductService.recalculateCost(id)
+      const idx = products.value.findIndex(p => p.id === id)
+      if (idx !== -1) products.value[idx] = result
+      if (product.value?.id === id) product.value = result
+      success('Saved cost updated from today\'s cloth price')
+      return result
+    } catch (err) {
+      showError(err.message || ErrorMessages.GENERIC)
+      return null
+    } finally {
+      saving.value = false
+    }
+  }
+
   const updateProduct = async (id, data) => {
     saving.value = true
     try {
@@ -137,6 +154,7 @@ export function useProducts() {
     fetchTrending,
     createProduct,
     updateProduct,
+    recalculateCost,
     deleteProduct,
   }
 }

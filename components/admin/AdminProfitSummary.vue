@@ -2,7 +2,7 @@
   <div class="ta-profit-summary" :class="{ 'ta-profit-summary--compact': compact }">
     <div class="ta-profit-summary__grid">
       <div class="ta-profit-summary__item">
-        <span class="ta-profit-summary__label">Cost</span>
+        <span class="ta-profit-summary__label">{{ costLabel }}</span>
         <strong>{{ formatCurrency(totalCost) }}</strong>
       </div>
       <div class="ta-profit-summary__item">
@@ -51,6 +51,7 @@ import { calcProfit, calcProfitMargin, calcRecommendedPrice, meetsTargetMargin }
 const props = defineProps({
   sellingPrice: { type: Number, default: 0 },
   totalCost: { type: Number, default: 0 },
+  costLabel: { type: String, default: 'Cost' },
   targetMargin: { type: Number, default: 40 },
   showTarget: { type: Boolean, default: true },
   compact: { type: Boolean, default: false },

@@ -49,23 +49,36 @@
                 <p class="text-h6">{{ formatCurrency(product.selling_price) }}</p>
               </v-col>
               <v-col cols="6">
-                <p class="text-caption text-medium-emphasis">Cost</p>
+                <p class="text-caption text-medium-emphasis">Saved cost</p>
                 <p class="text-h6">{{ formatCurrency(product.cost_price) }}</p>
               </v-col>
             </v-row>
 
             <AdminProfitSummary
               :selling-price="product.selling_price"
-              :total-cost="product.cost_price"
+              :total-cost="liveCost"
               :target-margin="product.target_margin"
+              cost-label="Today's cost"
               class="mt-4"
             />
+            <v-btn
+              class="mt-3"
+              variant="outlined"
+              prepend-icon="mdi-calculator"
+              :loading="saving"
+              @click="recalculate"
+            >
+              Recalculate saved cost
+            </v-btn>
+            <p class="text-caption text-medium-emphasis mt-2">
+              Stores today's cloth price on this dress. Orders already placed keep the cost they were confirmed with.
+            </p>
           </v-card>
 
           <v-card elevation="0" border rounded="lg" class="pa-4 mb-4">
             <h3 class="text-subtitle-1 font-weight-semibold mb-2">Inventory</h3>
             <v-row dense>
-              <v-col cols="4"><p class="text-caption">Stock</p><strong>{{ product.stock }}</strong></v-col>
+              <v-col cols="4"><p class="text-caption">Can make</p><strong>{{ product.stock }}</strong></v-col>
               <v-col cols="4"><p class="text-caption">Low Stock At</p><strong>{{ product.low_stock_threshold }}</strong></v-col>
               <v-col cols="4"><p class="text-caption">Status</p><AdminStatusChip :status="stockStatus" :label-map="StockStatusLabels" :color-map="StockStatusColors" /></v-col>
             </v-row>
@@ -127,7 +140,10 @@
           </div>
           <v-divider class="my-2" />
           <div class="ta-admin-product-detail__cost-row ta-admin-product-detail__cost-row--total">
-            <span>Total Product Cost</span><strong>{{ formatCurrency(product.cost_price) }}</strong>
+            <span>Today's cost</span><strong>{{ formatCurrency(liveCost) }}</strong>
+          </div>
+          <div class="ta-admin-product-detail__cost-row">
+            <span>Saved cost</span><span>{{ formatCurrency(product.cost_price) }}</span>
           </div>
         </div>
       </AdminFormSection>
@@ -141,7 +157,7 @@ import { PageTitles } from '~/constants/pageTitles.js'
 import { ProductStatus, ProductStatusLabels, ProductStatusColors } from '~/enums/productStatus.js'
 import { StockStatusLabels, StockStatusColors } from '~/enums/stockStatus.js'
 import { formatCurrency } from '~/helpers/currency.js'
-import { calcMaterialLineCost } from '~/helpers/profit.js'
+import { calcLiveProductCost, calcMaterialLineCost } from '~/helpers/profit.js'
 import { getImageUrl, getProductImageUrl } from '~/helpers/imageUrl.js'
 
 definePageMeta({ layout: 'admin', middleware: 'admin' })
@@ -152,7 +168,7 @@ const productId = route.params.id
 
 useHead({ title: PageTitles.ADMIN_PRODUCT_DETAIL })
 
-const { product, loading, fetchProduct, updateProduct } = useProducts()
+const { product, loading, saving, fetchProduct, updateProduct, recalculateCost } = useProducts()
 
 const activeImage = ref('')
 const gallery = computed(() => (product.value?.images || []).map(img => getImageUrl(img)).filter(Boolean))
@@ -163,6 +179,8 @@ const stockStatus = computed(() => {
   if (product.value.stock <= (product.value.low_stock_threshold || 5)) return 'low_stock'
   return 'in_stock'
 })
+
+const liveCost = computed(() => calcLiveProductCost(product.value || {}))
 
 const costItems = computed(() => {
   const p = product.value
@@ -177,6 +195,10 @@ const costItems = computed(() => {
 })
 
 const duplicate = () => router.push({ path: Routes.ADMIN_PRODUCT_CREATE, query: { duplicate: productId } })
+
+const recalculate = async () => {
+  await recalculateCost(productId)
+}
 
 const toggleStatus = async () => {
   const newStatus = product.value.status === ProductStatus.ACTIVE ? ProductStatus.INACTIVE : ProductStatus.ACTIVE

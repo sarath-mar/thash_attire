@@ -187,25 +187,29 @@
           <v-text-field v-model.number="form.target_margin" label="Target Profit Margin (%)" type="number" suffix="%" variant="outlined" density="comfortable" :rules="[nonNegative('Target margin')]" />
         </v-col>
       </v-row>
+      <v-alert v-if="initialData.id" type="info" variant="tonal" density="compact" class="mb-3">
+        Saving keeps this dress's saved cost. The figures below use today's cloth price. Use Recalculate saved cost on the product page when you want to store that price.
+      </v-alert>
       <AdminProfitSummary
         :selling-price="form.selling_price"
         :total-cost="totalCost"
         :target-margin="form.target_margin"
+        cost-label="Today's cost"
       />
     </AdminFormSection>
 
     <!-- Inventory -->
-    <AdminFormSection title="Inventory" subtitle="Pieces you can make from the materials above">
+    <AdminFormSection title="Inventory" subtitle="The most this dress can take from cloth that is still in stock">
       <v-row dense>
         <v-col cols="12" md="4">
           <v-text-field
             :model-value="calculatedStock"
-            label="Current Stock"
+            label="Can make now"
             type="number"
             variant="outlined"
             density="comfortable"
             readonly
-            hint="Lowest number of pieces the selected materials can cover. Add materials and quantities to calculate it."
+            hint="Other dresses share this cloth. An order takes the meters it needs from the one shared pile."
             persistent-hint
           />
         </v-col>

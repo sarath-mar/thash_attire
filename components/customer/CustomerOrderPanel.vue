@@ -84,7 +84,7 @@ import { formatCurrency } from '~/helpers/currency.js'
 import { formatDate } from '~/helpers/date.js'
 import { downloadOrderPdf } from '~/helpers/orderPdf.js'
 import { OrderStatusLabels } from '~/enums/orderStatus.js'
-import { PaymentMethodLabels, PaymentStatus, PaymentStatusLabels } from '~/enums/paymentStatus.js'
+import { PaymentAppLabels, PaymentMethodLabels, PaymentStatus, PaymentStatusLabels } from '~/enums/paymentStatus.js'
 
 const props = defineProps({
   orders: { type: Array, default: () => [] },
@@ -133,10 +133,15 @@ function isPaid(order) {
 
 function download(order) {
   if (!isPaid(order)) return
+  const config = useRuntimeConfig()
   downloadOrderPdf(order, {
-    placed: placedLabel(order),
-    payment: paymentLabel(order),
-    expected: order.expected_delivery ? formatDate(order.expected_delivery) : '',
+    placed: formatDate(order.order_date || order.sale_date) || '—',
+    expected: order.expected_delivery ? formatDate(order.expected_delivery) : '—',
+    method: PaymentMethodLabels[order.payment_method] || 'Paid',
+    app: PaymentAppLabels[order.payment_app] || '',
+    paidOn: order.payment_date ? formatDate(order.payment_date) : '',
+    transaction: order.transaction_id || '',
+    companyPhone: config.public.whatsappNumber || '',
   })
 }
 </script>

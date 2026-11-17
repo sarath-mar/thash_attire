@@ -1,0 +1,998 @@
+-- Thash Attire: shared material inventory and order-time costing.
+-- Run this once in the Supabase SQL editor for an existing project.
+-- Fresh installs already include these changes in supabase/schema.sql.
+
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS material_inventory BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS materials_deducted BOOLEAN NOT NULL DEFAULT false;
+
+-- ─── RPC: record material purchase (weighted avg) ───────────
+CREATE OR REPLACE FUNCTION record_material_purchase(
+  p_material_id UUID,
+  p_quantity NUMERIC,
+  p_unit_cost NUMERIC,
+  p_total_amount NUMERIC,
+  p_purchase_date TIMESTAMPTZ,
+  p_supplier TEXT DEFAULT NULL,
+  p_unit TEXT DEFAULT NULL,
+  p_notes TEXT DEFAULT NULL
+) RETURNS JSONB AS $$
+DECLARE
+  v_purchase_id UUID;
+  v_current_stock NUMERIC;
+  v_current_avg NUMERIC;
+  v_new_avg NUMERIC;
+BEGIN
+  IF NOT public.is_staff() THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+
+  IF p_quantity IS NULL OR p_quantity <= 0 THEN
+    RAISE EXCEPTION 'Purchase quantity must be greater than 0';
+  END IF;
+
+  SELECT stock, avg_unit_cost INTO v_current_stock, v_current_avg
+  FROM materials WHERE id = p_material_id FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Material not found';
+  END IF;
+
+  v_current_stock := COALESCE(v_current_stock, 0);
+  v_current_avg := COALESCE(v_current_avg, 0);
+
+  IF (v_current_stock + p_quantity) > 0 THEN
+    v_new_avg := ((v_current_stock * v_current_avg) + (p_quantity * p_unit_cost))
+                 / (v_current_stock + p_quantity);
+  ELSE
+    v_new_avg := p_unit_cost;
+  END IF;
+
+  UPDATE materials
+  SET
+    stock = v_current_stock + p_quantity,
+    avg_unit_cost = ROUND(v_new_avg, 2),
+    updated_at = NOW()
+  WHERE id = p_material_id;
+
+  INSERT INTO material_purchases (
+    material_id, quantity, unit_cost, total_amount,
+    purchase_date, supplier, unit, notes
+  ) VALUES (
+    p_material_id, p_quantity, p_unit_cost, p_total_amount,
+    p_purchase_date, p_supplier, p_unit, p_notes
+  ) RETURNING id INTO v_purchase_id;
+
+  PERFORM public.apply_material_stock_to_products(p_material_id);
+
+  RETURN jsonb_build_object('id', v_purchase_id);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ─── RPC: delete material purchase (reverse stock + avg) ────
+CREATE OR REPLACE FUNCTION delete_material_purchase(
+  p_purchase_id UUID
+) RETURNS JSONB AS $$
+DECLARE
+  v_material_id UUID;
+  v_quantity NUMERIC;
+  v_unit_cost NUMERIC;
+  v_current_stock NUMERIC;
+  v_current_avg NUMERIC;
+  v_new_stock NUMERIC;
+  v_new_avg NUMERIC;
+BEGIN
+  IF NOT public.is_staff() THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+
+  SELECT material_id, quantity, unit_cost
+  INTO v_material_id, v_quantity, v_unit_cost
+  FROM material_purchases
+  WHERE id = p_purchase_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Purchase not found';
+  END IF;
+
+  SELECT stock, avg_unit_cost INTO v_current_stock, v_current_avg
+  FROM materials WHERE id = v_material_id FOR UPDATE;
+
+  v_current_stock := COALESCE(v_current_stock, 0);
+  v_current_avg := COALESCE(v_current_avg, 0);
+  v_new_stock := v_current_stock - COALESCE(v_quantity, 0);
+
+  IF v_new_stock < 0 THEN
+    RAISE EXCEPTION 'Cannot delete purchase: would result in negative stock (current %, purchase %)',
+      v_current_stock, v_quantity;
+  END IF;
+
+  IF v_new_stock > 0 THEN
+    v_new_avg := ((v_current_stock * v_current_avg) - (v_quantity * v_unit_cost)) / v_new_stock;
+    IF v_new_avg < 0 THEN
+      v_new_avg := 0;
+    END IF;
+  ELSE
+    v_new_avg := 0;
+  END IF;
+
+  UPDATE materials
+  SET
+    stock = v_new_stock,
+    avg_unit_cost = ROUND(v_new_avg, 2),
+    updated_at = NOW()
+  WHERE id = v_material_id;
+
+  DELETE FROM material_purchases WHERE id = p_purchase_id;
+
+  PERFORM public.apply_material_stock_to_products(v_material_id);
+
+  RETURN jsonb_build_object(
+    'id', p_purchase_id,
+    'material_id', v_material_id,
+    'new_stock', v_new_stock,
+    'new_avg_unit_cost', ROUND(v_new_avg, 2)
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ─── Shared cloth: piece cache, live cost, order consumption ─
+CREATE OR REPLACE FUNCTION public.product_live_unit_cost(p_product_id UUID)
+RETURNS NUMERIC
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_cost NUMERIC;
+BEGIN
+  SELECT
+    COALESCE(p.stitching_cost, 0)
+    + COALESCE(p.packaging_cost, 0)
+    + COALESCE(p.other_cost, 0)
+    + COALESCE((
+      SELECT SUM(pm.quantity_required * COALESCE(m.avg_unit_cost, 0))
+      FROM product_materials pm
+      JOIN materials m ON m.id = pm.material_id
+      WHERE pm.product_id = p.id
+    ), 0)
+  INTO v_cost
+  FROM products p
+  WHERE p.id = p_product_id;
+
+  RETURN ROUND(COALESCE(v_cost, 0), 2);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.apply_product_stock_cache(p_product_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_stock INTEGER;
+BEGIN
+  SELECT COALESCE(MIN(FLOOR(m.stock / pm.quantity_required)::INTEGER), 0)
+  INTO v_stock
+  FROM product_materials pm
+  JOIN materials m ON m.id = pm.material_id
+  WHERE pm.product_id = p_product_id
+    AND pm.quantity_required > 0;
+
+  UPDATE products
+  SET stock = GREATEST(COALESCE(v_stock, 0), 0),
+      updated_at = NOW()
+  WHERE id = p_product_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.apply_material_stock_to_products(p_material_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_product_id UUID;
+BEGIN
+  FOR v_product_id IN
+    SELECT product_id FROM product_materials WHERE material_id = p_material_id
+  LOOP
+    PERFORM public.apply_product_stock_cache(v_product_id);
+  END LOOP;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.refresh_product_stock(p_product_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT public.is_staff() THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+
+  PERFORM public.apply_product_stock_cache(p_product_id);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.recalculate_product_cost(p_product_id UUID)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_cost NUMERIC;
+BEGIN
+  IF NOT public.is_staff() THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM products WHERE id = p_product_id) THEN
+    RAISE EXCEPTION 'Product not found';
+  END IF;
+
+  PERFORM 1
+  FROM materials m
+  JOIN product_materials pm ON pm.material_id = m.id
+  WHERE pm.product_id = p_product_id
+  ORDER BY m.id
+  FOR UPDATE OF m;
+
+  v_cost := public.product_live_unit_cost(p_product_id);
+
+  UPDATE products
+  SET cost_price = v_cost,
+      updated_at = NOW()
+  WHERE id = p_product_id;
+
+  RETURN jsonb_build_object('id', p_product_id, 'cost_price', v_cost);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.confirm_sale_materials(p_sale_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_sale sales%ROWTYPE;
+  v_item RECORD;
+  v_need RECORD;
+BEGIN
+  SELECT * INTO v_sale FROM sales WHERE id = p_sale_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Order not found';
+  END IF;
+
+  IF NOT COALESCE(v_sale.material_inventory, false) OR COALESCE(v_sale.materials_deducted, false) THEN
+    RETURN;
+  END IF;
+
+  PERFORM 1
+  FROM materials m
+  WHERE m.id IN (
+    SELECT pm.material_id
+    FROM sale_items si
+    JOIN product_materials pm ON pm.product_id = si.product_id
+    WHERE si.sale_id = p_sale_id
+  )
+  ORDER BY m.id
+  FOR UPDATE;
+
+  FOR v_item IN
+    SELECT id, product_id
+    FROM sale_items
+    WHERE sale_id = p_sale_id
+    ORDER BY id
+  LOOP
+    UPDATE sale_items
+    SET cost_price = public.product_live_unit_cost(v_item.product_id)
+    WHERE id = v_item.id;
+  END LOOP;
+
+  FOR v_need IN
+    SELECT
+      pm.material_id,
+      m.name,
+      m.stock,
+      m.unit,
+      SUM(pm.quantity_required * si.quantity) AS qty
+    FROM sale_items si
+    JOIN product_materials pm ON pm.product_id = si.product_id
+    JOIN materials m ON m.id = pm.material_id
+    WHERE si.sale_id = p_sale_id
+      AND pm.quantity_required > 0
+      AND COALESCE(si.quantity, 0) > 0
+    GROUP BY pm.material_id, m.name, m.stock, m.unit
+    ORDER BY pm.material_id
+  LOOP
+    IF COALESCE(v_need.stock, 0) < v_need.qty THEN
+      RAISE EXCEPTION 'Not enough % left. This order needs % % and % % is available',
+        v_need.name,
+        v_need.qty,
+        COALESCE(v_need.unit, 'units'),
+        COALESCE(v_need.stock, 0),
+        COALESCE(v_need.unit, 'units');
+    END IF;
+
+    UPDATE materials
+    SET stock = stock - v_need.qty,
+        updated_at = NOW()
+    WHERE id = v_need.material_id;
+
+    INSERT INTO material_stock_movements (material_id, quantity, reason, reference_id)
+    VALUES (v_need.material_id, -v_need.qty, 'PRODUCTION', p_sale_id);
+
+    PERFORM public.apply_material_stock_to_products(v_need.material_id);
+  END LOOP;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.restore_sale_materials(p_sale_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_sale sales%ROWTYPE;
+  v_need RECORD;
+BEGIN
+  SELECT * INTO v_sale FROM sales WHERE id = p_sale_id FOR UPDATE;
+  IF NOT FOUND OR NOT COALESCE(v_sale.materials_deducted, false) THEN
+    RETURN;
+  END IF;
+
+  PERFORM 1
+  FROM materials m
+  WHERE m.id IN (
+    SELECT material_id
+    FROM material_stock_movements
+    WHERE reference_id = p_sale_id
+      AND reason IN ('PRODUCTION', 'ADJUSTMENT')
+  )
+  ORDER BY m.id
+  FOR UPDATE;
+
+  FOR v_need IN
+    SELECT material_id, SUM(quantity) AS net
+    FROM material_stock_movements
+    WHERE reference_id = p_sale_id
+      AND reason IN ('PRODUCTION', 'ADJUSTMENT')
+    GROUP BY material_id
+    HAVING SUM(quantity) < 0
+    ORDER BY material_id
+  LOOP
+    UPDATE materials
+    SET stock = stock + (-v_need.net),
+        updated_at = NOW()
+    WHERE id = v_need.material_id;
+
+    INSERT INTO material_stock_movements (material_id, quantity, reason, reference_id)
+    VALUES (v_need.material_id, -v_need.net, 'ADJUSTMENT', p_sale_id);
+
+    PERFORM public.apply_material_stock_to_products(v_need.material_id);
+  END LOOP;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.product_live_unit_cost(UUID) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.apply_product_stock_cache(UUID) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.apply_material_stock_to_products(UUID) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.confirm_sale_materials(UUID) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.restore_sale_materials(UUID) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.refresh_product_stock(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.refresh_product_stock(UUID) TO authenticated;
+REVOKE ALL ON FUNCTION public.recalculate_product_cost(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.recalculate_product_cost(UUID) TO authenticated;
+
+-- ─── RPC: create product + optional showcase sample ─────────
+CREATE OR REPLACE FUNCTION create_product_with_sample(
+  p_product JSONB,
+  p_materials JSONB,
+  p_create_sample BOOLEAN,
+  p_showcase_stitching_cost NUMERIC
+) RETURNS UUID AS $$
+DECLARE
+  v_product_id UUID;
+  v_material JSONB;
+  v_available_stock NUMERIC;
+  v_avg_unit_cost NUMERIC;
+  v_total_material_cost NUMERIC := 0;
+  v_required_qty NUMERIC;
+  v_colors TEXT[];
+  v_sizes TEXT[];
+  v_images TEXT[];
+  v_videos TEXT[];
+BEGIN
+  IF NOT public.is_staff() THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+
+  IF p_product->'colors' IS NOT NULL THEN
+    v_colors := ARRAY(SELECT jsonb_array_elements_text(p_product->'colors'));
+  ELSE
+    v_colors := '{}';
+  END IF;
+
+  IF p_product->'sizes' IS NOT NULL THEN
+    v_sizes := ARRAY(SELECT jsonb_array_elements_text(p_product->'sizes'));
+  ELSE
+    v_sizes := '{}';
+  END IF;
+
+  IF p_product->'images' IS NOT NULL THEN
+    v_images := ARRAY(SELECT jsonb_array_elements_text(p_product->'images'));
+  ELSE
+    v_images := '{}';
+  END IF;
+
+  IF p_product->'videos' IS NOT NULL THEN
+    v_videos := ARRAY(SELECT jsonb_array_elements_text(p_product->'videos'));
+  ELSE
+    v_videos := '{}';
+  END IF;
+
+  INSERT INTO products (
+    name, sku, description, category_id, selling_price, cost_price,
+    stock, status, is_featured, is_trending, sizes, colors, images, videos,
+    is_showcase, showcase_stitching_cost, initial_sample_created,
+    stitching_cost, packaging_cost, other_cost, low_stock_threshold, target_margin
+  ) VALUES (
+    p_product->>'name',
+    p_product->>'sku',
+    p_product->>'description',
+    (p_product->>'category_id')::UUID,
+    COALESCE((p_product->>'selling_price')::NUMERIC, 0),
+    COALESCE((p_product->>'cost_price')::NUMERIC, 0),
+    COALESCE((p_product->>'stock')::INTEGER, 0),
+    COALESCE(p_product->>'status', 'active'),
+    COALESCE((p_product->>'is_featured')::BOOLEAN, false),
+    COALESCE((p_product->>'is_trending')::BOOLEAN, false),
+    v_sizes,
+    v_colors,
+    v_images,
+    v_videos,
+    COALESCE((p_product->>'is_showcase')::BOOLEAN, TRUE),
+    p_showcase_stitching_cost,
+    p_create_sample,
+    COALESCE((p_product->>'stitching_cost')::NUMERIC, 0),
+    COALESCE((p_product->>'packaging_cost')::NUMERIC, 0),
+    COALESCE((p_product->>'other_cost')::NUMERIC, 0),
+    COALESCE((p_product->>'low_stock_threshold')::INTEGER, 5),
+    COALESCE((p_product->>'target_margin')::NUMERIC, 40)
+  ) RETURNING id INTO v_product_id;
+
+  IF p_materials IS NOT NULL THEN
+    FOR v_material IN SELECT * FROM jsonb_array_elements(p_materials)
+    LOOP
+      v_required_qty := COALESCE((v_material->>'quantity')::NUMERIC, 0);
+
+      INSERT INTO product_materials (product_id, material_id, quantity_required)
+      VALUES (v_product_id, (v_material->>'material_id')::UUID, v_required_qty);
+
+      IF p_create_sample THEN
+        SELECT stock, avg_unit_cost INTO v_available_stock, v_avg_unit_cost
+        FROM materials
+        WHERE id = (v_material->>'material_id')::UUID FOR UPDATE;
+
+        IF v_available_stock < v_required_qty THEN
+          RAISE EXCEPTION 'Insufficient stock for material ID %', v_material->>'material_id';
+        END IF;
+
+        UPDATE materials
+        SET stock = stock - v_required_qty,
+            updated_at = NOW()
+        WHERE id = (v_material->>'material_id')::UUID;
+
+        INSERT INTO material_stock_movements (material_id, quantity, reason, reference_id)
+        VALUES (
+          (v_material->>'material_id')::UUID,
+          -v_required_qty,
+          'INITIAL_SHOWCASE_SAMPLE',
+          v_product_id
+        );
+
+        v_total_material_cost := v_total_material_cost
+          + (v_required_qty * COALESCE(v_avg_unit_cost, 0));
+      END IF;
+    END LOOP;
+  END IF;
+
+  IF p_create_sample THEN
+    INSERT INTO product_samples (
+      product_id, material_cost, showcase_stitching_cost, other_cost, total_cost
+    ) VALUES (
+      v_product_id,
+      v_total_material_cost,
+      COALESCE(p_showcase_stitching_cost, 0),
+      COALESCE((p_product->>'other_cost')::NUMERIC, 0),
+      v_total_material_cost
+        + COALESCE(p_showcase_stitching_cost, 0)
+        + COALESCE((p_product->>'other_cost')::NUMERIC, 0)
+    );
+  END IF;
+
+  UPDATE products
+  SET cost_price = public.product_live_unit_cost(v_product_id),
+      updated_at = NOW()
+  WHERE id = v_product_id;
+
+  IF EXISTS (
+    SELECT 1 FROM product_materials
+    WHERE product_id = v_product_id AND quantity_required > 0
+  ) THEN
+    PERFORM public.apply_product_stock_cache(v_product_id);
+  END IF;
+
+  RETURN v_product_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ─── Stock is reduced only after payment is recorded ────────
+CREATE OR REPLACE FUNCTION public.deduct_sale_stock(p_sale_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_item RECORD;
+  v_stock INTEGER;
+BEGIN
+  FOR v_item IN
+    SELECT product_id, quantity, product_name
+    FROM sale_items
+    WHERE sale_id = p_sale_id
+    ORDER BY product_id
+  LOOP
+    IF v_item.product_id IS NULL THEN
+      CONTINUE;
+    END IF;
+
+    SELECT stock INTO v_stock
+    FROM products
+    WHERE id = v_item.product_id
+    FOR UPDATE;
+
+    IF NOT FOUND OR COALESCE(v_stock, 0) < COALESCE(v_item.quantity, 0) THEN
+      RAISE EXCEPTION 'Insufficient stock for %', COALESCE(v_item.product_name, 'a product in this order');
+    END IF;
+
+    UPDATE products
+    SET stock = stock - COALESCE(v_item.quantity, 0),
+        updated_at = NOW()
+    WHERE id = v_item.product_id;
+  END LOOP;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.deduct_sale_stock(UUID) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.deduct_sale_stock(UUID) FROM anon, authenticated;
+
+-- Puts pieces back when a paid order is cancelled. Runs only if stock was deducted.
+CREATE OR REPLACE FUNCTION public.restore_sale_stock(p_sale_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_item RECORD;
+BEGIN
+  FOR v_item IN
+    SELECT product_id, quantity
+    FROM sale_items
+    WHERE sale_id = p_sale_id
+    ORDER BY product_id
+  LOOP
+    IF v_item.product_id IS NULL THEN
+      CONTINUE;
+    END IF;
+
+    UPDATE products
+    SET stock = stock + COALESCE(v_item.quantity, 0),
+        updated_at = NOW()
+    WHERE id = v_item.product_id;
+  END LOOP;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.restore_sale_stock(UUID) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.restore_sale_stock(UUID) FROM anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_sale_stock_on_status()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NEW.status = 'cancelled' AND OLD.status IS DISTINCT FROM 'cancelled' THEN
+    IF COALESCE(OLD.stock_deducted, false) THEN
+      PERFORM public.restore_sale_stock(OLD.id);
+      NEW.stock_deducted := false;
+    END IF;
+    IF COALESCE(OLD.materials_deducted, false) THEN
+      PERFORM public.restore_sale_materials(OLD.id);
+      NEW.materials_deducted := false;
+    END IF;
+  ELSIF OLD.status = 'cancelled' AND NEW.status IS DISTINCT FROM 'cancelled' THEN
+    IF COALESCE(OLD.material_inventory, false) THEN
+      IF NOT COALESCE(OLD.materials_deducted, false) THEN
+        PERFORM public.confirm_sale_materials(OLD.id);
+        NEW.materials_deducted := true;
+      END IF;
+    ELSIF COALESCE(NEW.payment_status, '') = 'paid' AND NOT COALESCE(OLD.stock_deducted, false) THEN
+      PERFORM public.deduct_sale_stock(OLD.id);
+      NEW.stock_deducted := true;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS sync_sale_stock_on_status ON sales;
+CREATE TRIGGER sync_sale_stock_on_status
+  BEFORE UPDATE OF status ON sales
+  FOR EACH ROW
+  EXECUTE FUNCTION public.sync_sale_stock_on_status();
+
+CREATE OR REPLACE FUNCTION public.record_sale_payment(
+  p_sale_id UUID,
+  p_method TEXT,
+  p_payment_date TIMESTAMPTZ,
+  p_transaction_id TEXT,
+  p_payment_app TEXT,
+  p_status TEXT,
+  p_status_history JSONB
+) RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_sale sales%ROWTYPE;
+BEGIN
+  IF NOT public.is_staff() THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+
+  SELECT * INTO v_sale FROM sales WHERE id = p_sale_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Order not found';
+  END IF;
+
+  IF v_sale.status = 'cancelled' THEN
+    RAISE EXCEPTION 'This order is cancelled';
+  END IF;
+
+  IF NOT COALESCE(v_sale.material_inventory, false)
+     AND NOT COALESCE(v_sale.stock_deducted, false) THEN
+    PERFORM public.deduct_sale_stock(p_sale_id);
+  END IF;
+
+  UPDATE sales
+  SET
+    payment_status = 'paid',
+    payment_method = COALESCE(p_method, payment_method),
+    payment_date = COALESCE(p_payment_date, NOW()),
+    transaction_id = NULLIF(trim(COALESCE(p_transaction_id, '')), ''),
+    payment_app = NULLIF(p_payment_app, ''),
+    status = COALESCE(NULLIF(p_status, ''), status),
+    status_history = COALESCE(p_status_history, status_history),
+    stock_deducted = CASE
+      WHEN COALESCE(v_sale.material_inventory, false) THEN COALESCE(v_sale.stock_deducted, false)
+      ELSE true
+    END,
+    updated_at = NOW()
+  WHERE id = p_sale_id;
+
+  RETURN jsonb_build_object('id', p_sale_id);
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.record_sale_payment(UUID, TEXT, TIMESTAMPTZ, TEXT, TEXT, TEXT, JSONB) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.record_sale_payment(UUID, TEXT, TIMESTAMPTZ, TEXT, TEXT, TEXT, JSONB) TO authenticated;
+
+-- ─── RPC: create sale + items. Cloth is taken when the order is confirmed ──
+CREATE OR REPLACE FUNCTION create_sale_transaction(
+  p_sale JSONB,
+  p_items JSONB
+) RETURNS JSONB AS $$
+DECLARE
+  v_sale_id UUID;
+  v_item JSONB;
+BEGIN
+  IF NOT public.is_staff() THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+
+  INSERT INTO sales (
+    order_number, customer_id, customer_name, customer_phone, offer_id,
+    discount, final_amount, payment_method, payment_status,
+    status, sale_date, order_date, expected_delivery, shipping_address, notes,
+    stock_deducted, material_inventory
+  ) VALUES (
+    p_sale->>'order_number',
+    (p_sale->>'customer_id')::UUID,
+    p_sale->>'customer_name',
+    p_sale->>'customer_phone',
+    CASE WHEN p_sale->>'offer_id' IS NULL THEN NULL ELSE (p_sale->>'offer_id')::UUID END,
+    COALESCE((p_sale->>'discount')::NUMERIC, 0),
+    COALESCE((p_sale->>'final_amount')::NUMERIC, 0),
+    p_sale->>'payment_method',
+    COALESCE(p_sale->>'payment_status', 'pending'),
+    COALESCE(p_sale->>'status', 'order_received'),
+    COALESCE((p_sale->>'sale_date')::TIMESTAMPTZ, NOW()),
+    COALESCE((p_sale->>'order_date')::TIMESTAMPTZ, NOW()),
+    CASE
+      WHEN p_sale->>'expected_delivery' IS NULL THEN NULL
+      ELSE (p_sale->>'expected_delivery')::TIMESTAMPTZ
+    END,
+    p_sale->>'shipping_address',
+    p_sale->>'notes',
+    false,
+    true
+  ) RETURNING id INTO v_sale_id;
+
+  FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
+  LOOP
+    INSERT INTO sale_items (
+      sale_id, offer_id, product_id, product_name, quantity, selling_price, cost_price
+    ) VALUES (
+      v_sale_id,
+      CASE WHEN v_item->>'offer_id' IS NULL THEN NULL ELSE (v_item->>'offer_id')::UUID END,
+      (v_item->>'product_id')::UUID,
+      v_item->>'product_name',
+      (v_item->>'quantity')::INTEGER,
+      (v_item->>'selling_price')::NUMERIC,
+      0
+    );
+  END LOOP;
+
+  PERFORM public.confirm_sale_materials(v_sale_id);
+
+  UPDATE sales
+  SET materials_deducted = true,
+      updated_at = NOW()
+  WHERE id = v_sale_id;
+
+  RETURN jsonb_build_object('id', v_sale_id);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+DROP FUNCTION IF EXISTS public.place_customer_order(JSONB, TEXT, TEXT, TEXT, TEXT, TEXT);
+
+CREATE OR REPLACE FUNCTION public.place_customer_order(
+  p_items JSONB,
+  p_shipping_address TEXT,
+  p_payment_method TEXT,
+  p_name TEXT DEFAULT NULL,
+  p_phone TEXT DEFAULT NULL,
+  p_notes TEXT DEFAULT NULL,
+  p_offer_id UUID DEFAULT NULL
+) RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_uid UUID := auth.uid();
+  v_customer customers;
+  v_item JSONB;
+  v_product products;
+  v_qty INTEGER;
+  v_sale_id UUID;
+  v_order_number TEXT;
+  v_final NUMERIC := 0;
+  v_first_product_id UUID;
+  v_first_price NUMERIC;
+  v_total_qty INTEGER := 0;
+  v_names TEXT[] := '{}';
+  v_size TEXT;
+  v_color TEXT;
+  v_label TEXT;
+  v_summary TEXT;
+  v_offer offers%ROWTYPE;
+  v_discount NUMERIC := 0;
+  v_expected INTEGER := 0;
+  v_got INTEGER := 0;
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'Please sign in to place an order';
+  END IF;
+
+  IF p_shipping_address IS NULL OR length(trim(p_shipping_address)) < 8 THEN
+    RAISE EXCEPTION 'Please enter a complete shipping address';
+  END IF;
+
+  IF p_payment_method NOT IN ('cash', 'upi') THEN
+    RAISE EXCEPTION 'Please choose a valid payment method';
+  END IF;
+
+  IF p_items IS NULL OR jsonb_typeof(p_items) <> 'array' OR jsonb_array_length(p_items) = 0 THEN
+    RAISE EXCEPTION 'Your bag is empty';
+  END IF;
+
+  v_customer := public.upsert_my_customer_profile(p_name, NULL, p_phone, p_shipping_address);
+
+  IF v_customer.phone IS NULL OR v_customer.phone = '' THEN
+    RAISE EXCEPTION 'Please add a mobile number to continue';
+  END IF;
+
+  LOOP
+    v_order_number := 'TA'
+      || to_char(NOW() AT TIME ZONE 'Asia/Kolkata', 'YYMMDD')
+      || upper(substr(md5(random()::text || clock_timestamp()::text), 1, 6));
+    EXIT WHEN NOT EXISTS (SELECT 1 FROM sales WHERE order_number = v_order_number);
+  END LOOP;
+
+  INSERT INTO sales (
+    order_number, customer_id, customer_name, customer_phone,
+    discount, final_amount, payment_method, payment_status,
+    status, sale_date, order_date, expected_delivery, shipping_address, notes, status_history,
+    material_inventory
+  ) VALUES (
+    v_order_number,
+    v_customer.id,
+    v_customer.name,
+    v_customer.phone,
+    0,
+    0,
+    p_payment_method,
+    'pending',
+    'order_received',
+    NOW(),
+    NOW(),
+    NOW() + INTERVAL '5 days',
+    trim(p_shipping_address),
+    NULLIF(trim(COALESCE(p_notes, '')), ''),
+    jsonb_build_array(jsonb_build_object('status', 'order_received', 'date', NOW())),
+    true
+  ) RETURNING id INTO v_sale_id;
+
+  FOR v_item IN SELECT value FROM jsonb_array_elements(p_items)
+  LOOP
+    IF (v_item->>'product_id') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+      RAISE EXCEPTION 'A piece in your bag is no longer available';
+    END IF;
+
+    v_qty := COALESCE((v_item->>'quantity')::INTEGER, 0);
+    IF v_qty < 1 OR v_qty > 20 THEN
+      RAISE EXCEPTION 'Quantity must be between 1 and 20';
+    END IF;
+
+    SELECT * INTO v_product
+    FROM products
+    WHERE id = (v_item->>'product_id')::UUID
+    FOR UPDATE;
+
+    IF NOT FOUND
+       OR v_product.status IS DISTINCT FROM 'active'
+       OR COALESCE(v_product.is_showcase, false) THEN
+      RAISE EXCEPTION 'A piece in your bag is no longer available';
+    END IF;
+
+    v_size := NULLIF(trim(COALESCE(v_item->>'size', '')), '');
+    v_color := NULLIF(trim(COALESCE(v_item->>'color', '')), '');
+    v_label := v_product.name;
+    IF v_color IS NOT NULL OR v_size IS NOT NULL THEN
+      v_label := v_label || ' (' || concat_ws(', ', v_color, v_size) || ')';
+    END IF;
+
+    IF v_first_product_id IS NULL THEN
+      v_first_product_id := v_product.id;
+      v_first_price := v_product.selling_price;
+    END IF;
+
+    v_names := array_append(v_names, v_label);
+    v_total_qty := v_total_qty + v_qty;
+    v_final := v_final + (COALESCE(v_product.selling_price, 0) * v_qty);
+
+    INSERT INTO sale_items (
+      sale_id, product_id, product_name, quantity, selling_price, cost_price
+    ) VALUES (
+      v_sale_id,
+      v_product.id,
+      v_label,
+      v_qty,
+      COALESCE(v_product.selling_price, 0),
+      0
+    );
+
+  END LOOP;
+
+  IF p_offer_id IS NOT NULL THEN
+    SELECT * INTO v_offer
+    FROM offers
+    WHERE id = p_offer_id
+      AND status = 'active'
+      AND (start_date IS NULL OR start_date <= NOW())
+      AND (end_date IS NULL OR end_date >= NOW());
+
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'This offer is no longer available';
+    END IF;
+
+    SELECT COUNT(*) INTO v_expected FROM offer_items WHERE offer_id = p_offer_id;
+    SELECT COUNT(*) INTO v_got FROM jsonb_array_elements(p_items);
+
+    IF v_expected <> v_got OR v_expected = 0 THEN
+      RAISE EXCEPTION 'This offer is no longer available';
+    END IF;
+
+    IF EXISTS (
+      SELECT 1
+      FROM offer_items oi
+      WHERE oi.offer_id = p_offer_id
+        AND NOT EXISTS (
+          SELECT 1
+          FROM jsonb_array_elements(p_items) AS cart
+          WHERE (cart->>'product_id')::uuid = oi.product_id
+            AND COALESCE((cart->>'quantity')::int, 0) = oi.quantity
+        )
+    ) THEN
+      RAISE EXCEPTION 'This offer is no longer available';
+    END IF;
+
+    v_discount := GREATEST(v_final - COALESCE(v_offer.offer_price, 0), 0);
+    v_final := COALESCE(v_offer.offer_price, v_final);
+  END IF;
+
+  IF array_length(v_names, 1) > 1 THEN
+    v_summary := v_names[1] || ' + ' || (array_length(v_names, 1) - 1)::TEXT || ' more';
+  ELSE
+    v_summary := v_names[1];
+  END IF;
+
+  UPDATE sales
+  SET
+    product_id = v_first_product_id,
+    product_name = v_summary,
+    quantity = v_total_qty,
+    selling_price = v_first_price,
+    discount = v_discount,
+    offer_id = p_offer_id,
+    final_amount = v_final,
+    updated_at = NOW()
+  WHERE id = v_sale_id;
+
+  PERFORM public.confirm_sale_materials(v_sale_id);
+
+  UPDATE sales
+  SET materials_deducted = true,
+      updated_at = NOW()
+  WHERE id = v_sale_id;
+
+  UPDATE customers
+  SET
+    total_orders = COALESCE(total_orders, 0) + 1,
+    total_amount = COALESCE(total_amount, 0) + v_final,
+    updated_at = NOW()
+  WHERE id = v_customer.id;
+
+  RETURN jsonb_build_object(
+    'id', v_sale_id,
+    'order_number', v_order_number,
+    'final_amount', v_final
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.upsert_my_customer_profile(TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.upsert_my_customer_profile(TEXT, TEXT, TEXT, TEXT) TO authenticated;
+REVOKE ALL ON FUNCTION public.place_customer_order(JSONB, TEXT, TEXT, TEXT, TEXT, TEXT, UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.place_customer_order(JSONB, TEXT, TEXT, TEXT, TEXT, TEXT, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.is_staff() TO authenticated, service_role;
+
